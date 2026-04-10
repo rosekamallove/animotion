@@ -1,0 +1,166 @@
+import fs from "fs";
+import path from "path";
+import { execSync } from "child_process";
+
+const REMOTION_ROOT = path.resolve(process.cwd(), "remotion");
+const GENERATED_DIR = path.join(REMOTION_ROOT, "src", "generated");
+const ROOT_TSX = path.join(REMOTION_ROOT, "src", "Root.tsx");
+const MANIFEST_PATH = path.join(GENERATED_DIR, "manifest.json");
+
+const IMPORTS_START = "/* ANIMOTION_IMPORTS_START */";
+const IMPORTS_END = "/* ANIMOTION_IMPORTS_END */";
+const COMPOSITIONS_START = "{/* ANIMOTION_COMPOSITIONS_START */}";
+const COMPOSITIONS_END = "{/* ANIMOTION_COMPOSITIONS_END */}";
+
+interface ManifestEntry {
+  name: string;
+  file: string;
+  duration: number;
+  fps: number;
+  createdAt: string;
+}
+
+interface Manifest {
+  scenes: ManifestEntry[];
+}
+
+function ensureGeneratedDir() {
+  if (!fs.existsSync(GENERATED_DIR)) {
+    fs.mkdirSync(GENERATED_DIR, { recursive: true });
+  }
+}
+
+function readManifest(): Manifest {
+  if (!fs.existsSync(MANIFEST_PATH)) {
+    return { scenes: [] };
+  }
+  return JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf-8"));
+}
+
+function writeManifest(manifest: Manifest) {
+  fs.writeFileSync(MANIFEST_PATH, JSON.stringify(manifest, null, 2));
+}
+
+export function writeScene(
+  sceneName: string,
+  code: string,
+  durationFrames: number,
+  fps: number
+): { scenePath: string } {
+  ensureGeneratedDir();
+
+  const fileName = `${sceneName}.tsx`;
+  const scenePath = path.join(GENERATED_DIR, fileName);
+
+  // Write the scene file
+  fs.writeFileSync(scenePath, code);
+
+  // Update manifest
+  const manifest = readManifest();
+  const existingIdx = manifest.scenes.findIndex((s) => s.name === sceneName);
+  const entry: ManifestEntry = {
+    name: sceneName,
+    file: fileName,
+    duration: durationFrames,
+    fps,
+    createdAt: new Date().toISOString(),
+  };
+
+  if (existingIdx >= 0) {
+    manifest.scenes[existingIdx] = entry;
+  } else {
+    manifest.scenes.push(entry);
+  }
+  writeManifest(manifest);
+
+  // Update Root.tsx
+  updateRootTsx(manifest);
+
+  return { scenePath };
+}
+
+function updateRootTsx(manifest: Manifest) {
+  let rootContent = fs.readFileSync(ROOT_TSX, "utf-8");
+
+  // Inject markers if they don't exist yet
+  if (!rootContent.includes(IMPORTS_START)) {
+    // Add import markers before the RemotionRoot export
+    rootContent = rootContent.replace(
+      /export const RemotionRoot/,
+      `${IMPORTS_START}\n${IMPORTS_END}\n\nexport const RemotionRoot`
+    );
+  }
+
+  if (!rootContent.includes(COMPOSITIONS_START)) {
+    // Add composition markers before the closing </> tag
+    rootContent = rootContent.replace(
+      /(\s*)<\/>/,
+      `\n      ${COMPOSITIONS_START}\n      ${COMPOSITIONS_END}\n$1</>`
+    );
+
+    // Also add Folder import if not present
+    if (!rootContent.includes("Folder")) {
+      rootContent = rootContent.replace(
+        'import { Composition } from "remotion";',
+        'import { Composition, Folder } from "remotion";'
+      );
+    }
+  }
+
+  // Generate import block
+  const imports = manifest.scenes
+    .map((s) => `import { ${s.name} } from "./generated/${s.name}";`)
+    .join("\n");
+
+  // Generate composition block
+  const compositions = manifest.scenes
+    .map(
+      (s) =>
+        `        <Composition\n          id="${s.name}"\n          component={${s.name}}\n          durationInFrames={${s.duration}}\n          fps={${s.fps}}\n          width={1920}\n          height={1080}\n        />`
+    )
+    .join("\n");
+
+  const compositionsBlock = manifest.scenes.length > 0
+    ? `<Folder name="Generated">\n${compositions}\n      </Folder>`
+    : "";
+
+  // Replace between markers
+  const importsRegex = new RegExp(
+    `${escapeRegex(IMPORTS_START)}[\\s\\S]*?${escapeRegex(IMPORTS_END)}`
+  );
+  rootContent = rootContent.replace(
+    importsRegex,
+    `${IMPORTS_START}\n${imports}\n${IMPORTS_END}`
+  );
+
+  const compositionsRegex = new RegExp(
+    `${escapeRegex(COMPOSITIONS_START)}[\\s\\S]*?${escapeRegex(COMPOSITIONS_END)}`
+  );
+  rootContent = rootContent.replace(
+    compositionsRegex,
+    `${COMPOSITIONS_START}\n      ${compositionsBlock}\n      ${COMPOSITIONS_END}`
+  );
+
+  fs.writeFileSync(ROOT_TSX, rootContent);
+}
+
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\\/]/g, "\\$&");
+}
+
+export function validateTypeScript(): { success: boolean; errors: string } {
+  try {
+    execSync("npx tsc --noEmit 2>&1", {
+      cwd: REMOTION_ROOT,
+      encoding: "utf-8",
+      timeout: 30000,
+    });
+    return { success: true, errors: "" };
+  } catch (error: unknown) {
+    const execError = error as { stdout?: string; stderr?: string };
+    return {
+      success: false,
+      errors: execError.stdout || execError.stderr || "Unknown TypeScript error",
+    };
+  }
+}

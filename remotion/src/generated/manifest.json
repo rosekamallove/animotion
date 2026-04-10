@@ -1,0 +1,25 @@
+{
+  "scenes": [
+    {
+      "name": "NeuralNetworkTextProcessor",
+      "file": "NeuralNetworkTextProcessor.tsx",
+      "duration": 300,
+      "fps": 30,
+      "createdAt": "2026-04-09T13:07:24.725Z"
+    },
+    {
+      "name": "NeuralNetworkTextProcessing",
+      "file": "NeuralNetworkTextProcessing.tsx",
+      "duration": 300,
+      "fps": 30,
+      "createdAt": "2026-04-09T19:16:25.111Z"
+    },
+    {
+      "name": "QuantizationExplainer",
+      "file": "QuantizationExplainer.tsx",
+      "duration": 840,
+      "fps": 30,
+      "createdAt": "2026-04-10T09:17:54.874Z"
+    }
+  ]
+}
