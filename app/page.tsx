@@ -59,6 +59,9 @@ export default function Home() {
   const [fixed, setFixed] = useState(false);
   const [streamingText, setStreamingText] = useState("");
   const [planPreview, setPlanPreview] = useState<Partial<AnimationPlan> | null>(null);
+  const [duration, setDuration] = useState<string>("");
+  const [fpsOption, setFpsOption] = useState<number>(30);
+  const [feedback, setFeedback] = useState("");
   const streamRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -126,7 +129,7 @@ export default function Home() {
       let accumulated = "";
       const result = await consumeSSE(
         "/api/generate-plan",
-        { prompt, style },
+        { prompt, style, duration: duration ? Number(duration) : undefined, fps: fpsOption },
         (text, snapshot) => {
           accumulated += text;
           setStreamingText(accumulated);
@@ -216,6 +219,62 @@ export default function Home() {
     setFixed(false);
     setStreamingText("");
     setPlanPreview(null);
+    setDuration("");
+    setFpsOption(30);
+    setFeedback("");
+  };
+
+  const handleRevisePlan = async () => {
+    if (!plan || !feedback.trim()) return;
+    setState("planning");
+    setError("");
+    setStreamingText("");
+    setPlanPreview(null);
+
+    try {
+      let accumulated = "";
+      const result = await consumeSSE(
+        "/api/generate-plan",
+        { prompt, style, currentPlan: plan, feedback, duration: duration ? Number(duration) : undefined, fps: fpsOption },
+        (text, snapshot) => {
+          accumulated += text;
+          setStreamingText(accumulated);
+          if (snapshot && typeof snapshot === "object") {
+            setPlanPreview(snapshot as Partial<AnimationPlan>);
+          }
+        }
+      );
+
+      if (result.type === "error") {
+        throw new Error(result.error as string);
+      }
+
+      setPlan(result.plan as AnimationPlan);
+      setPlanPreview(null);
+      setStreamingText("");
+      setFeedback("");
+      setState("reviewing");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to revise plan");
+      setState("error");
+    }
+  };
+
+  const updatePlanDuration = (seconds: number) => {
+    if (!plan || seconds < 1) return;
+    setPlan({ ...plan, durationSeconds: seconds, durationFrames: seconds * plan.fps });
+  };
+
+  const updatePlanFps = (newFps: number) => {
+    if (!plan) return;
+    setPlan({ ...plan, fps: newFps, durationFrames: plan.durationSeconds * newFps });
+  };
+
+  const updatePhaseTime = (index: number, field: "startSecond" | "endSecond", value: number) => {
+    if (!plan) return;
+    const phases = [...plan.phases];
+    phases[index] = { ...phases[index], [field]: value };
+    setPlan({ ...plan, phases });
   };
 
   const getStepClass = (stepKey: string) => {
@@ -285,6 +344,41 @@ export default function Home() {
             onChange={(e) => setPrompt(e.target.value)}
             placeholder='e.g. "Create a 10-second scene showing three stat cards bouncing in with large numbers on a dark background..."'
           />
+          <div style={{ display: "flex", gap: 16, marginTop: 16, alignItems: "center" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: "var(--muted-fg)" }}>Duration</label>
+              <input
+                type="number"
+                min="3"
+                max="60"
+                value={duration}
+                onChange={(e) => setDuration(e.target.value)}
+                placeholder="auto"
+                style={{
+                  width: 70, padding: "8px 10px", borderRadius: 8,
+                  border: "1px solid var(--border)", background: "var(--muted)",
+                  color: "var(--foreground)", fontSize: 14, fontFamily: "monospace",
+                }}
+              />
+              <span style={{ fontSize: 13, color: "var(--muted-fg)" }}>sec</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: "var(--muted-fg)" }}>FPS</label>
+              <select
+                value={fpsOption}
+                onChange={(e) => setFpsOption(Number(e.target.value))}
+                style={{
+                  padding: "8px 10px", borderRadius: 8,
+                  border: "1px solid var(--border)", background: "var(--muted)",
+                  color: "var(--foreground)", fontSize: 14,
+                }}
+              >
+                <option value={30}>30</option>
+                <option value={60}>60</option>
+              </select>
+            </div>
+          </div>
+
           <div style={{ marginTop: 16 }}>
             <button className="btn btn-primary" onClick={handleGeneratePlan} disabled={!prompt.trim()}>
               Generate Plan
@@ -376,30 +470,83 @@ export default function Home() {
               <div style={{ fontSize: 18, fontWeight: 700 }}>{plan.sceneName}</div>
               <div style={{ fontSize: 14, color: "var(--muted-fg)", marginTop: 4 }}>{plan.description}</div>
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <span className="badge badge-info">{plan.durationSeconds}s</span>
-              <span className="badge badge-info">{plan.fps}fps</span>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <input
+                  type="number"
+                  min={1}
+                  max={60}
+                  value={plan.durationSeconds}
+                  onChange={(e) => updatePlanDuration(Number(e.target.value))}
+                  style={{
+                    width: 44, padding: "4px 6px", borderRadius: 6, textAlign: "center",
+                    border: "1px solid rgba(0,212,255,0.3)", background: "rgba(0,212,255,0.15)",
+                    color: "var(--primary)", fontSize: 12, fontWeight: 700, fontFamily: "monospace",
+                  }}
+                />
+                <span style={{ fontSize: 12, fontWeight: 700, color: "var(--primary)" }}>s</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <select
+                  value={plan.fps}
+                  onChange={(e) => updatePlanFps(Number(e.target.value))}
+                  style={{
+                    padding: "4px 6px", borderRadius: 6,
+                    border: "1px solid rgba(0,212,255,0.3)", background: "rgba(0,212,255,0.15)",
+                    color: "var(--primary)", fontSize: 12, fontWeight: 700,
+                  }}
+                >
+                  <option value={30}>30</option>
+                  <option value={60}>60</option>
+                </select>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "var(--primary)" }}>fps</span>
+              </div>
             </div>
           </div>
 
-          <div style={{ marginBottom: 20 }}>
+          {plan.phases && plan.phases.length > 0 && <div style={{ marginBottom: 20 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: "var(--muted-fg)", marginBottom: 12, textTransform: "uppercase", letterSpacing: 1 }}>
               Phases
             </div>
             {plan.phases.map((phase, i) => (
               <div key={i} style={{ padding: "12px 16px", borderRadius: 8, background: "var(--muted)", marginBottom: 8, borderLeft: "3px solid var(--primary)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span style={{ fontWeight: 600, fontSize: 14 }}>{phase.name}</span>
-                  <span style={{ fontSize: 12, color: "var(--muted-fg)", fontFamily: "monospace" }}>
-                    {phase.startSecond}s - {phase.endSecond}s
-                  </span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.5}
+                      value={phase.startSecond}
+                      onChange={(e) => updatePhaseTime(i, "startSecond", Number(e.target.value))}
+                      style={{
+                        width: 40, padding: "2px 4px", borderRadius: 4, textAlign: "center",
+                        border: "1px solid var(--border)", background: "transparent",
+                        color: "var(--muted-fg)", fontSize: 12, fontFamily: "monospace",
+                      }}
+                    />
+                    <span style={{ fontSize: 12, color: "var(--muted-fg)" }}>-</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.5}
+                      value={phase.endSecond}
+                      onChange={(e) => updatePhaseTime(i, "endSecond", Number(e.target.value))}
+                      style={{
+                        width: 40, padding: "2px 4px", borderRadius: 4, textAlign: "center",
+                        border: "1px solid var(--border)", background: "transparent",
+                        color: "var(--muted-fg)", fontSize: 12, fontFamily: "monospace",
+                      }}
+                    />
+                    <span style={{ fontSize: 12, color: "var(--muted-fg)" }}>s</span>
+                  </div>
                 </div>
                 <div style={{ fontSize: 13, color: "var(--muted-fg)", marginTop: 4 }}>{phase.description}</div>
               </div>
             ))}
-          </div>
+          </div>}
 
-          <div style={{ marginBottom: 20 }}>
+          {plan.visualElements && plan.visualElements.length > 0 && <div style={{ marginBottom: 20 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: "var(--muted-fg)", marginBottom: 12, textTransform: "uppercase", letterSpacing: 1 }}>
               Visual Elements
             </div>
@@ -410,11 +557,27 @@ export default function Home() {
                 </span>
               ))}
             </div>
+          </div>}
+
+          <div style={{ marginBottom: 20 }}>
+            <textarea
+              value={feedback}
+              onChange={(e) => setFeedback(e.target.value)}
+              placeholder="Suggest changes... (e.g. &quot;make the token split more dramatic&quot;, &quot;add a shake effect when overflow happens&quot;)"
+              style={{ minHeight: 80 }}
+            />
           </div>
 
-          <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
+          <div style={{ display: "flex", gap: 12 }}>
             <button className="btn btn-success" onClick={handleApproveAndGenerate}>
               Approve & Generate Code
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={handleRevisePlan}
+              disabled={!feedback.trim()}
+            >
+              Revise Plan
             </button>
             <button className="btn btn-outline" onClick={handleReset}>Start Over</button>
           </div>

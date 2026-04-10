@@ -16,6 +16,7 @@ import { NeuralNetworkTextProcessor } from "./generated/NeuralNetworkTextProcess
 import { NeuralNetworkTextProcessing } from "./generated/NeuralNetworkTextProcessing";
 import { QuantizationExplainer } from "./generated/QuantizationExplainer";
 import { LlmTokenizationExplainer } from "./generated/LlmTokenizationExplainer";
+import { NeuralNetworkCatRecognition } from "./generated/NeuralNetworkCatRecognition";
 /* ANIMOTION_IMPORTS_END */
 
 export const RemotionRoot: React.FC = () => {
@@ -131,6 +132,14 @@ export const RemotionRoot: React.FC = () => {
           id="LlmTokenizationExplainer"
           component={LlmTokenizationExplainer}
           durationInFrames={450}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="NeuralNetworkCatRecognition"
+          component={NeuralNetworkCatRecognition}
+          durationInFrames={840}
           fps={30}
           width={1920}
           height={1080}

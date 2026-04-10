@@ -1,16 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
-import { streamPlan } from "../../../lib/claude";
+import { streamPlan, streamRevisePlan } from "../../../lib/claude";
 import type { AnimationPlan } from "../../../lib/claude";
 
 export async function POST(req: NextRequest) {
   try {
-    const { prompt, style } = await req.json();
+    const { prompt, style, currentPlan, feedback, duration, fps } = await req.json();
 
     if (!prompt || typeof prompt !== "string") {
       return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
     }
 
-    const stream = streamPlan(prompt, style || "standard");
+    // Build the effective prompt with optional duration/fps hints
+    let effectivePrompt = prompt;
+    if (duration || fps) {
+      const d = duration ? `${duration} seconds` : "an appropriate length";
+      const f = fps || 30;
+      const parts = [];
+      if (duration) parts.push(`exactly ${duration} seconds long`);
+      parts.push(`at ${f} fps`);
+      if (duration) parts.push(`(${duration * f} frames total)`);
+      effectivePrompt += `\n\nThe animation MUST be ${parts.join(" ")}.`;
+    }
+
+    // Choose between initial generation and revision
+    const stream = currentPlan && feedback
+      ? streamRevisePlan(effectivePrompt, currentPlan as AnimationPlan, feedback, style || "standard")
+      : streamPlan(effectivePrompt, style || "standard");
+
     const encoder = new TextEncoder();
 
     const readable = new ReadableStream({

@@ -79,7 +79,7 @@ const planTool = {
 export async function generatePlan(prompt: string, style: StylePreset = "standard"): Promise<AnimationPlan> {
   const message = await client.messages.create({
     model: "claude-sonnet-4-6",
-    max_tokens: 4096,
+    max_tokens: 8192,
     system: getPlanSystemPrompt(style),
     tools: [planTool],
     tool_choice: { type: "tool", name: "create_animation_plan" },
@@ -139,7 +139,7 @@ IMPORTANT: Return ONLY the TSX code. No markdown fences, no explanations, no com
 export function streamPlan(prompt: string, style: StylePreset = "standard") {
   return client.messages.stream({
     model: "claude-sonnet-4-6",
-    max_tokens: 4096,
+    max_tokens: 8192,
     system: getPlanSystemPrompt(style),
     tools: [planTool],
     tool_choice: { type: "tool", name: "create_animation_plan" },
@@ -147,6 +147,52 @@ export function streamPlan(prompt: string, style: StylePreset = "standard") {
       {
         role: "user",
         content: `Create a detailed animation plan for:\n\n${prompt}`,
+      },
+    ],
+  });
+}
+
+export function streamRevisePlan(
+  originalPrompt: string,
+  currentPlan: AnimationPlan,
+  feedback: string,
+  style: StylePreset = "standard"
+) {
+  return client.messages.stream({
+    model: "claude-sonnet-4-6",
+    max_tokens: 8192,
+    system: getPlanSystemPrompt(style),
+    tools: [planTool],
+    tool_choice: { type: "tool", name: "create_animation_plan" },
+    messages: [
+      {
+        role: "user",
+        content: `Create a detailed animation plan for:\n\n${originalPrompt}`,
+      },
+      {
+        role: "assistant",
+        content: [
+          {
+            type: "tool_use",
+            id: "plan_1",
+            name: "create_animation_plan",
+            input: currentPlan as unknown as Record<string, unknown>,
+          },
+        ],
+      },
+      {
+        role: "user",
+        content: [
+          {
+            type: "tool_result",
+            tool_use_id: "plan_1",
+            content: "Plan received. The user has reviewed it and wants changes.",
+          },
+        ],
+      },
+      {
+        role: "user",
+        content: `Revise the animation plan based on this feedback:\n\n${feedback}\n\nReturn the complete updated plan with all fields.`,
       },
     ],
   });

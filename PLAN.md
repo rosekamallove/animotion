@@ -139,9 +139,42 @@ Add "Render" buttons in the UI to render the generated scene to MP4 at 1080p or 
 
 ---
 
+## Phase 5: State Persistence
+
+### Goal
+If code generation fails, the browser crashes, or the user refreshes, they shouldn't lose their prompt, plan, or selected style. Currently everything lives in React state and is gone on refresh.
+
+### Approach
+Use `sessionStorage` (per-tab, clears on tab close) to persist the working session:
+- On every state change, save a snapshot: `{ state, style, prompt, plan, code, error }`
+- On mount, check for a saved snapshot and restore it
+- Clear storage on explicit "Start Over" or successful completion
+- This means: if code gen fails → refresh → you're back in the reviewing state with your plan intact
+
+### What to persist
+| Field | Storage | Restore to |
+|-------|---------|------------|
+| `state` | sessionStorage | Current step (skip planning/generating — go to idle or reviewing) |
+| `style` | sessionStorage | Style selector |
+| `prompt` | sessionStorage | Prompt textarea |
+| `plan` | sessionStorage | Plan object (if reviewing/generating/done) |
+| `code` | sessionStorage | Generated code (if done) |
+| `duration`, `fps` | sessionStorage | Parameter inputs |
+
+### Edge cases
+- If restored state is `planning` or `generating` (mid-stream), snap back to `idle` or `reviewing` respectively — don't try to resume a stream
+- If restored state is `writing`, snap to `reviewing` with the plan (write is fast, user can re-approve)
+- `error` state restores as-is so the user can see what failed
+
+### Files to modify
+- `app/page.tsx` — add `useEffect` for save/restore, wrap state setters
+
+---
+
 ## Implementation Order
 
-1. **Phase 1: Style Guides** — style presets, prompt injection, UI selector
-2. **Phase 2: Plan Review** — feedback loop, plan revision API
+1. **Phase 1: Style Guides** — style presets, prompt injection, UI selector ✅
+2. **Phase 2: Plan Review** — feedback loop, plan revision API, editable timing, initial params ✅
 3. **Phase 3: Preview** — iframe embed or @remotion/player
 4. **Phase 4: Rendering** — render API, 1080p/4K, download
+5. **Phase 5: State Persistence** — sessionStorage save/restore across refreshes
