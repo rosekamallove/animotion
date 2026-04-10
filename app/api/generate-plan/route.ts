@@ -32,11 +32,20 @@ export async function POST(req: NextRequest) {
     const readable = new ReadableStream({
       start(controller) {
         let closed = false;
+        let lastSnapshotTime = 0;
 
         stream.on("inputJson", (partialJson, jsonSnapshot) => {
           if (closed) return;
+          const now = Date.now();
+          const includeSnapshot = now - lastSnapshotTime > 150;
+          if (includeSnapshot) lastSnapshotTime = now;
+
           controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ type: "delta", text: partialJson, snapshot: jsonSnapshot })}\n\n`)
+            encoder.encode(`data: ${JSON.stringify({
+              type: "delta",
+              text: partialJson,
+              ...(includeSnapshot ? { snapshot: jsonSnapshot } : {}),
+            })}\n\n`)
           );
         });
 

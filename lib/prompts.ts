@@ -34,6 +34,16 @@ export function getCodeSystemPrompt(style: StylePreset = "standard"): string {
 9. No emojis — use Lucide React icons instead
 10. No gradient text (no backgroundClip: "text") — use solid colors only
 
+## LAYOUT RULES — CRITICAL FOR VISUAL QUALITY
+- Use a SINGLE centered flex container (flexDirection: "column", alignItems: "center", justifyContent: "center") inside AbsoluteFill for ALL main content
+- Do NOT scatter elements with random absolute positioning — group related elements together in flex rows/columns
+- Labels, stats, and annotations should be INSIDE or directly adjacent to the visual they describe, not floating separately
+- If you have a main visual (chart, funnel, diagram), center it and put all related labels/numbers as part of that same layout group
+- Use consistent spacing: gap property on flex containers, not arbitrary margin/padding guessing
+- Maximum 2 levels of nesting: main container → sections → elements. No deeper nesting.
+- ALL text and elements must have clear visual hierarchy and stay within an 80% center zone (padding ~10% on each side)
+- Side-by-side layouts: use flexDirection: "row" with gap, not absolute left/right positioning
+
 ## AVAILABLE IMPORTS (ONLY these — nothing else)
 \`\`\`tsx
 import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig, Sequence } from "remotion";

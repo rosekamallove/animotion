@@ -9,6 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { RemotionPreview } from "./components/RemotionPreview";
+import { CodeBlock } from "./components/CodeBlock";
 import {
   SpinnerGap,
   CheckCircle,
@@ -143,6 +145,7 @@ export default function Home() {
   const [duration, setDuration] = useState<string>("");
   const [fpsOption, setFpsOption] = useState<number>(30);
   const [feedback, setFeedback] = useState("");
+  const [writeStep, setWriteStep] = useState<"writing" | "validating" | "fixing">("writing");
   const streamRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -281,6 +284,10 @@ export default function Home() {
       setStreamingText("");
 
       setState("writing");
+      setWriteStep("writing");
+      // Brief delay so the user sees "Writing file..." before it jumps to validating
+      await new Promise(r => setTimeout(r, 300));
+      setWriteStep("validating");
       const writeRes = await fetch("/api/write-scene", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -295,6 +302,10 @@ export default function Home() {
       const writeData = await writeRes.json();
 
       if (writeData.success) {
+        if (writeData.fixed) {
+          setWriteStep("fixing");
+          await new Promise(r => setTimeout(r, 600));
+        }
         setScenePath(writeData.scenePath);
         setFixed(writeData.fixed || false);
         if (writeData.code) setCode(writeData.code);
@@ -325,6 +336,7 @@ export default function Home() {
     setDuration("");
     setFpsOption(30);
     setFeedback("");
+    setWriteStep("writing");
   };
 
   const handleRevisePlan = async () => {
@@ -392,13 +404,16 @@ export default function Home() {
   return (
     <div className="mx-auto max-w-[900px] w-full px-6 py-10">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-extrabold tracking-tight">
-          <span className="text-primary">Animotion</span>
-        </h1>
-        <p className="text-muted-foreground mt-1 text-lg">
-          Describe an animation. Get a Remotion scene.
-        </p>
+      <div className="mb-8 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-sm shadow-primary/25">
+            <Sparkle size={20} weight="fill" className="text-primary-foreground" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight">Animotion</h1>
+            <p className="text-sm text-muted-foreground">Describe an animation. Get a Remotion scene.</p>
+          </div>
+        </div>
       </div>
 
       {/* Step Indicator */}
@@ -579,21 +594,28 @@ export default function Home() {
             </div>
 
             {planPreview && (planPreview.sceneName || planPreview.phases) ? (
-              <div className="opacity-85 space-y-4">
+              <div className="opacity-90 space-y-4">
                 {planPreview.sceneName && (
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="text-lg font-bold">{planPreview.sceneName}</h3>
-                      {planPreview.description && (
-                        <p className="text-sm text-muted-foreground mt-1">{planPreview.description}</p>
+                  <div className="rounded-lg bg-muted/50 border p-4">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <code className="text-base font-bold font-mono text-foreground">{planPreview.sceneName}</code>
+                          <Badge variant="outline" className="text-[10px]" style={{ borderColor: styleOptions.find(s => s.id === style)?.colors.primary + "40", color: styleOptions.find(s => s.id === style)?.colors.primary }}>
+                            {style}
+                          </Badge>
+                        </div>
+                        {planPreview.description && (
+                          <p className="text-sm text-muted-foreground">{planPreview.description}</p>
+                        )}
+                      </div>
+                      {planPreview.durationSeconds && (
+                        <div className="flex gap-1.5 shrink-0 ml-4">
+                          <Badge variant="secondary" className="font-mono">{planPreview.durationSeconds}s</Badge>
+                          {planPreview.fps && <Badge variant="secondary" className="font-mono">{planPreview.fps}fps</Badge>}
+                        </div>
                       )}
                     </div>
-                    {planPreview.durationSeconds && (
-                      <div className="flex gap-1.5">
-                        <Badge variant="secondary">{planPreview.durationSeconds}s</Badge>
-                        {planPreview.fps && <Badge variant="secondary">{planPreview.fps}fps</Badge>}
-                      </div>
-                    )}
                   </div>
                 )}
 
@@ -644,31 +666,38 @@ export default function Home() {
       {state === "reviewing" && plan && (
         <Card>
           <CardHeader>
-            <div className="flex justify-between items-start">
-              <div>
-                <CardTitle>{plan.sceneName}</CardTitle>
-                <CardDescription className="mt-1">{plan.description}</CardDescription>
-              </div>
-              <div className="flex gap-2 items-center">
-                <Input
-                  type="number"
-                  min={1}
-                  max={60}
-                  value={plan.durationSeconds}
-                  onChange={(e) => updatePlanDuration(Number(e.target.value))}
-                  className="w-14 h-7 text-center text-xs font-mono"
-                />
-                <span className="text-xs text-muted-foreground">s</span>
-                <Select value={String(plan.fps)} onValueChange={(v) => updatePlanFps(Number(v))}>
-                  <SelectTrigger className="w-16 h-7 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="30">30</SelectItem>
-                    <SelectItem value="60">60</SelectItem>
-                  </SelectContent>
-                </Select>
-                <span className="text-xs text-muted-foreground">fps</span>
+            <div className="rounded-lg bg-muted/50 border p-4">
+              <div className="flex justify-between items-start">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <code className="text-base font-bold font-mono text-foreground">{plan.sceneName}</code>
+                    <Badge variant="outline" className="text-[10px]" style={{ borderColor: styleOptions.find(s => s.id === style)?.colors.primary + "40", color: styleOptions.find(s => s.id === style)?.colors.primary }}>
+                      {style}
+                    </Badge>
+                  </div>
+                  <CardDescription>{plan.description}</CardDescription>
+                </div>
+                <div className="flex gap-2 items-center shrink-0 ml-4">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={60}
+                    value={plan.durationSeconds}
+                    onChange={(e) => updatePlanDuration(Number(e.target.value))}
+                    className="w-14 h-7 text-center text-xs font-mono"
+                  />
+                  <span className="text-xs text-muted-foreground">s</span>
+                  <Select value={String(plan.fps)} onValueChange={(v) => updatePlanFps(Number(v))}>
+                    <SelectTrigger className="w-16 h-7 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="30">30</SelectItem>
+                      <SelectItem value="60">60</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <span className="text-xs text-muted-foreground">fps</span>
+                </div>
               </div>
             </div>
           </CardHeader>
@@ -777,9 +806,37 @@ export default function Home() {
       {/* WRITING */}
       {state === "writing" && (
         <Card>
-          <CardContent className="py-12 text-center">
-            <SpinnerGap size={24} className="animate-spin text-primary mx-auto" />
-            <p className="mt-4 text-sm font-semibold">Writing to disk & validating TypeScript...</p>
+          <CardContent className="pt-6">
+            <div className="space-y-3">
+              {[
+                { key: "writing", label: "Writing file to disk" },
+                { key: "validating", label: "Validating TypeScript" },
+                { key: "fixing", label: "Auto-fixing issues" },
+              ].map((step) => {
+                const stepOrder = ["writing", "validating", "fixing"];
+                const currentIdx = stepOrder.indexOf(writeStep);
+                const stepIdx = stepOrder.indexOf(step.key);
+                const isDone = stepIdx < currentIdx;
+                const isActive = step.key === writeStep;
+                // Only show "fixing" step if we're actually at that step
+                if (step.key === "fixing" && writeStep !== "fixing") return null;
+
+                return (
+                  <div key={step.key} className="flex items-center gap-3">
+                    {isDone ? (
+                      <CheckCircle size={18} weight="fill" className="text-success" />
+                    ) : isActive ? (
+                      <SpinnerGap size={18} className="animate-spin text-primary" />
+                    ) : (
+                      <div className="w-[18px] h-[18px] rounded-full border-2 border-muted" />
+                    )}
+                    <span className={`text-sm ${isActive ? "font-semibold text-foreground" : isDone ? "text-success" : "text-muted-foreground"}`}>
+                      {step.label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </CardContent>
         </Card>
       )}
@@ -788,26 +845,27 @@ export default function Home() {
       {state === "done" && plan && (
         <Card>
           <CardContent className="pt-6 space-y-5">
-            <div className="flex items-center gap-2">
-              <Badge className="bg-success/10 text-success border-success/20">Success</Badge>
-              {fixed && <Badge variant="secondary">Auto-fixed</Badge>}
-            </div>
-
-            <div>
-              <h3 className="text-lg font-bold">{plan.sceneName} is ready!</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                Written to: <code className="text-primary text-xs">{scenePath}</code>
-              </p>
-            </div>
-
-            <div className="rounded-lg border bg-muted/30 p-4">
-              <p className="text-sm font-semibold mb-2">Preview</p>
-              <div className="rounded-md border bg-background p-3 font-mono text-xs text-muted-foreground whitespace-pre">
-                cd remotion{"\n"}npx remotion studio
+            <div className="rounded-lg bg-success/5 border border-success/20 p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <CheckCircle size={18} weight="fill" className="text-success" />
+                <code className="text-base font-bold font-mono">{plan.sceneName}</code>
+                <Badge className="bg-success/10 text-success border-success/20 text-[10px]">Ready</Badge>
+                {fixed && <Badge variant="secondary" className="text-[10px]">Auto-fixed</Badge>}
               </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                Select <strong className="text-primary">{plan.sceneName}</strong> from the Generated folder.
+              <p className="text-sm text-muted-foreground">
+                Written to <code className="text-xs text-primary bg-primary/5 px-1.5 py-0.5 rounded">{scenePath}</code>
               </p>
+            </div>
+
+            {/* Live Preview */}
+            <div>
+              <p className="text-sm font-semibold mb-2">Preview</p>
+              <RemotionPreview
+                key={scenePath}
+                sceneName={plan.sceneName}
+                durationInFrames={plan.durationFrames}
+                fps={plan.fps}
+              />
             </div>
 
             <details className="group">
@@ -815,7 +873,7 @@ export default function Home() {
                 Render to video
               </summary>
               <div className="mt-2 rounded-md border bg-background p-3 font-mono text-xs text-muted-foreground whitespace-pre">
-                npx remotion render {plan.sceneName} out/{plan.sceneName}.mp4
+                cd remotion{"\n"}npx remotion render {plan.sceneName} out/{plan.sceneName}.mp4
               </div>
             </details>
 
@@ -823,8 +881,8 @@ export default function Home() {
               <summary className="cursor-pointer text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors">
                 View code ({code.split("\n").length} lines)
               </summary>
-              <div className="mt-2 rounded-lg border bg-muted/30 p-4 font-mono text-xs leading-relaxed overflow-auto max-h-[500px] whitespace-pre-wrap break-words text-muted-foreground">
-                {code}
+              <div className="mt-2">
+                <CodeBlock code={code} />
               </div>
             </details>
 
@@ -841,12 +899,34 @@ export default function Home() {
               <Warning size={12} weight="bold" />
               Error
             </Badge>
-            <p className="text-sm text-destructive">{error}</p>
+            {/* Structured TS error display */}
+            {error.includes("error TS") ? (
+              <div className="space-y-2">
+                {error.split("\n").filter(Boolean).map((line, i) => {
+                  const match = line.match(/^(.+?)\((\d+),(\d+)\): error (TS\d+): (.+)$/);
+                  if (match) {
+                    return (
+                      <div key={i} className="rounded-md border border-destructive/20 bg-destructive/5 p-3">
+                        <div className="flex items-center gap-2 text-xs mb-1">
+                          <code className="text-destructive font-mono font-bold">{match[4]}</code>
+                          <span className="text-muted-foreground">{match[1]}</span>
+                          <Badge variant="outline" className="text-[10px] font-mono">L{match[2]}:{match[3]}</Badge>
+                        </div>
+                        <p className="text-sm text-destructive">{match[5]}</p>
+                      </div>
+                    );
+                  }
+                  return <p key={i} className="text-sm text-destructive">{line}</p>;
+                })}
+              </div>
+            ) : (
+              <p className="text-sm text-destructive">{error}</p>
+            )}
             {code && (
               <details>
                 <summary className="cursor-pointer text-xs font-semibold text-muted-foreground">View code</summary>
-                <div className="mt-2 rounded-lg border bg-muted/30 p-4 font-mono text-xs leading-relaxed overflow-auto max-h-[400px] whitespace-pre-wrap break-words text-muted-foreground">
-                  {code}
+                <div className="mt-2">
+                  <CodeBlock code={code} maxHeight={400} />
                 </div>
               </details>
             )}

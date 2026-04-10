@@ -59,14 +59,17 @@ const gridBg: React.CSSProperties = {
 - No textShadow glow — clean text only
 - Borders are thin (1px) and subtle
 - Spacing is generous but not excessive
-- Typography hierarchy: size and weight only, no color tricks`,
+- Typography hierarchy: size and weight only, no color tricks
+- LAYOUT: Center everything in a single column. Labels go directly on or next to their visual element, not floating on the sides
+- Stats/numbers should be in a clean horizontal row below or beside the main graphic, not scattered
+- Keep the composition tight and balanced — if there's a main visual, it should dominate 60% of the frame with supporting info neatly grouped around it`,
   designPrinciples: `- Background is always pure white #ffffff
 - Subtle grid overlay at 0.03 opacity for texture
 - Clean white cards with very subtle box-shadow
 - Thin borders (#e2e8f0) for structure
 - No text glow, no box glow, no neon effects
 - Smooth springs only (damping 200) for all animations
-- Keep all content within 1920x1080 bounds — don't overflow
+- Keep all content within 1920x1080 bounds with ~10% padding on each side — don't overflow
 - Stagger animations with delays, don't dump everything at once
 - Physical slide-up transitions, not scale pops
 - No emojis — use Lucide icons or styled divs
@@ -116,14 +119,15 @@ const gridBg: React.CSSProperties = {};`,
 - Text can be larger than normal — bold, impactful
 - Pulsing/breathing effects are encouraged for idle elements
 - Wiggle: Math.sin(frame * 0.3) * 2 for subtle idle animation
-- Background has no grid — keep it clean and warm`,
+- Background has no grid — keep it clean and warm
+- LAYOUT: Center everything. Labels and numbers should be part of the same flex group as their visual, not floating separately`,
   designPrinciples: `- Background is light warm #fdf4ff
 - No grid overlay — clean warm background
 - White cards with thick colorful borders and rounded corners (24px)
 - Colorful shadows using primary/accent colors at low opacity
 - Text glow via textShadow with warm colors is OK sparingly
 - Bouncy springs (damping 8-12) for ALL animations
-- Keep all content within 1920x1080 bounds — don't overflow
+- Keep all content within 1920x1080 bounds with ~10% padding on each side — don't overflow
 - Stagger animations with short delays (3-4 frame gaps)
 - Scale pops and slight rotation for entrances
 - No emojis — use Lucide icons or styled divs
@@ -176,14 +180,15 @@ const gridBg: React.CSSProperties = {
 - Text glow via textShadow with cyan/purple is OK for emphasis
 - Colored top/left borders on cards to indicate type
 - Grid overlay at low opacity for texture
-- Physical transformations are encouraged — shrinking blocks, scanning effects, counting numbers`,
+- Physical transformations are encouraged — shrinking blocks, scanning effects, counting numbers
+- LAYOUT: Use centered flex layouts. Keep labels attached to their visual elements, not scattered with absolute positioning`,
   designPrinciples: `- Background is light gray #f8fafc
 - Subtle grid overlay at 0.04 opacity for texture
 - Glass-morphism cards with blur effect
 - Colored top/left borders on cards to indicate type
 - Text glow via textShadow for emphasis (subtle, not neon)
 - Bouncy springs (damping 8-14) for impactful moments, smooth springs (damping 200) for text
-- Keep all content within 1920x1080 bounds — don't overflow
+- Keep all content within 1920x1080 bounds with ~10% padding on each side — don't overflow
 - Stagger animations with delays, don't dump everything at once
 - Physical transformations (shrinking, scaling, shaking) > simple fades
 - No emojis — use Lucide icons or styled divs
