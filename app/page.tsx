@@ -1,6 +1,25 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import {
+  SpinnerGap,
+  CheckCircle,
+  Warning,
+  ArrowRight,
+  Palette,
+  Timer,
+  Play,
+  FileTsx,
+  Sparkle,
+} from "@phosphor-icons/react";
 
 type AppState = "idle" | "planning" | "reviewing" | "generating" | "writing" | "done" | "error";
 type StylePreset = "professional" | "playful" | "standard";
@@ -9,12 +28,30 @@ const styleOptions: Array<{
   id: StylePreset;
   name: string;
   tagline: string;
-  colors: [string, string, string];
-  bg: string;
+  traits: string[];
+  colors: { bg: string; primary: string; accent: string; text: string };
 }> = [
-  { id: "professional", name: "Professional", tagline: "Clean, corporate, data-focused", colors: ["#2563eb", "#7c3aed", "#16a34a"], bg: "#ffffff" },
-  { id: "playful", name: "Playful", tagline: "Vibrant, bouncy, energetic", colors: ["#ec4899", "#f97316", "#14b8a6"], bg: "#fdf4ff" },
-  { id: "standard", name: "Standard", tagline: "Modern tech, cyan & purple", colors: ["#00d4ff", "#a855f7", "#22c55e"], bg: "#f8fafc" },
+  {
+    id: "professional",
+    name: "Professional",
+    tagline: "Clean, corporate, data-focused",
+    traits: ["Smooth fades", "No bounce", "Subtle shadows"],
+    colors: { bg: "#ffffff", primary: "#2563eb", accent: "#7c3aed", text: "#0f172a" },
+  },
+  {
+    id: "playful",
+    name: "Playful",
+    tagline: "Vibrant, bouncy, energetic",
+    traits: ["Bouncy springs", "Scale pops", "Thick borders"],
+    colors: { bg: "#fdf4ff", primary: "#ec4899", accent: "#f97316", text: "#1e1b4b" },
+  },
+  {
+    id: "standard",
+    name: "Standard",
+    tagline: "Modern tech, cyan & purple",
+    traits: ["Glass cards", "Grid overlay", "Mixed springs"],
+    colors: { bg: "#f8fafc", primary: "#00d4ff", accent: "#a855f7", text: "#0f172a" },
+  },
 ];
 
 interface AnimationPlan {
@@ -42,10 +79,10 @@ interface AnimationPlan {
 }
 
 const steps = [
-  { key: "idle", label: "1. Describe" },
-  { key: "reviewing", label: "2. Review Plan" },
-  { key: "generating", label: "3. Generate" },
-  { key: "done", label: "4. Done" },
+  { key: "idle", label: "Describe", icon: Sparkle },
+  { key: "reviewing", label: "Review", icon: FileTsx },
+  { key: "generating", label: "Generate", icon: Play },
+  { key: "done", label: "Done", icon: CheckCircle },
 ];
 
 const STORAGE_KEY = "animotion_session";
@@ -76,20 +113,15 @@ function loadSession(): SessionSnapshot | null {
 function saveSession(snapshot: SessionSnapshot) {
   try {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
-  } catch {
-    // Storage full or unavailable — ignore
-  }
+  } catch {}
 }
 
 function clearSession() {
   try {
     sessionStorage.removeItem(STORAGE_KEY);
-  } catch {
-    // Ignore
-  }
+  } catch {}
 }
 
-/** Mid-stream states can't be resumed — snap back to the last safe state */
 function safeState(s: AppState): AppState {
   if (s === "planning") return "idle";
   if (s === "generating" || s === "writing") return "reviewing";
@@ -113,7 +145,6 @@ export default function Home() {
   const [feedback, setFeedback] = useState("");
   const streamRef = useRef<HTMLDivElement>(null);
 
-  // Restore session on mount
   useEffect(() => {
     const saved = loadSession();
     if (saved) {
@@ -132,7 +163,6 @@ export default function Home() {
     setRestored(true);
   }, []);
 
-  // Save session on meaningful state changes
   useEffect(() => {
     if (!restored) return;
     saveSession({ state, style, prompt, plan, code, error, scenePath, fixed, duration, fpsOption });
@@ -182,9 +212,7 @@ export default function Home() {
             } else {
               result = data;
             }
-          } catch {
-            // Ignore malformed SSE lines
-          }
+          } catch {}
         }
       }
     }
@@ -352,394 +380,479 @@ export default function Home() {
     setPlan({ ...plan, phases });
   };
 
-  const getStepClass = (stepKey: string) => {
+  const getStepStatus = (stepKey: string) => {
     const order = ["idle", "planning", "reviewing", "generating", "writing", "done"];
     const ci = order.indexOf(state === "error" ? "idle" : state);
     const si = order.indexOf(stepKey === "done" ? "done" : stepKey);
-    if (stepKey === state || (state === "writing" && stepKey === "generating") || (state === "planning" && stepKey === "idle")) return "step active";
-    if (si < ci) return "step done";
-    return "step";
+    if (stepKey === state || (state === "writing" && stepKey === "generating") || (state === "planning" && stepKey === "idle")) return "active";
+    if (si < ci) return "done";
+    return "pending";
   };
 
   return (
-    <div className="container">
-      <div style={{ marginBottom: 32 }}>
-        <h1><span style={{ color: "var(--primary)" }}>Animotion</span></h1>
-        <h2 style={{ marginTop: 8 }}>Describe an animation. Get a Remotion scene.</h2>
+    <div className="mx-auto max-w-[900px] w-full px-6 py-10">
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-extrabold tracking-tight">
+          <span className="text-primary">Animotion</span>
+        </h1>
+        <p className="text-muted-foreground mt-1 text-lg">
+          Describe an animation. Get a Remotion scene.
+        </p>
       </div>
 
-      <div className="step-indicator">
-        {steps.map((s) => (
-          <div key={s.key} className={getStepClass(s.key)}>{s.label}</div>
-        ))}
+      {/* Step Indicator */}
+      <div className="flex items-center mb-8">
+        {steps.map((s, i) => {
+          const status = getStepStatus(s.key);
+          const Icon = s.icon;
+          return (
+            <div key={s.key} className="flex items-center">
+              <div className="flex items-center gap-2">
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${
+                    status === "active"
+                      ? "bg-primary text-primary-foreground shadow-sm shadow-primary/25"
+                      : status === "done"
+                      ? "bg-success text-white"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {status === "done" ? (
+                    <CheckCircle size={16} weight="bold" />
+                  ) : (
+                    <Icon size={16} weight={status === "active" ? "fill" : "regular"} />
+                  )}
+                </div>
+                <span
+                  className={`text-sm font-medium ${
+                    status === "active"
+                      ? "text-primary"
+                      : status === "done"
+                      ? "text-success"
+                      : "text-muted-foreground"
+                  }`}
+                >
+                  {s.label}
+                </span>
+              </div>
+              {i < steps.length - 1 && (
+                <div
+                  className={`mx-4 h-px flex-1 min-w-8 ${
+                    getStepStatus(steps[i + 1].key) !== "pending" ? "bg-success" : "bg-border"
+                  }`}
+                />
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* IDLE */}
       {state === "idle" && (
-        <div className="card">
-          <div style={{ marginBottom: 12, fontSize: 14, fontWeight: 700, color: "var(--muted-fg)", textTransform: "uppercase", letterSpacing: 1 }}>
-            Style
-          </div>
-          <div style={{ display: "flex", gap: 12, marginBottom: 24 }}>
-            {styleOptions.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => setStyle(s.id)}
-                style={{
-                  flex: 1,
-                  padding: "16px 16px 14px",
-                  borderRadius: 12,
-                  border: style === s.id ? `2px solid ${s.colors[0]}` : "2px solid var(--border)",
-                  background: style === s.id ? `${s.colors[0]}12` : "var(--muted)",
-                  cursor: "pointer",
-                  textAlign: "left",
-                  transition: "border-color 0.15s, background 0.15s",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                  <div style={{ width: 28, height: 28, borderRadius: 8, background: s.bg, border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <div style={{ display: "flex", gap: 2 }}>
-                      {s.colors.map((c, i) => (
-                        <div key={i} style={{ width: 6, height: 6, borderRadius: "50%", background: c }} />
-                      ))}
-                    </div>
-                  </div>
-                  <span style={{ fontSize: 15, fontWeight: 700, color: style === s.id ? s.colors[0] : "var(--foreground)" }}>{s.name}</span>
-                </div>
-                <div style={{ fontSize: 12, color: "var(--muted-fg)", lineHeight: 1.4 }}>{s.tagline}</div>
-              </button>
-            ))}
-          </div>
+        <Card>
+          <CardContent className="pt-6 space-y-6">
+            {/* Style Selector */}
+            <div>
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-3">
+                <Palette size={14} /> Style
+              </Label>
+              <div className="grid grid-cols-3 gap-3">
+                {styleOptions.map((s) => {
+                  const selected = style === s.id;
+                  return (
+                    <button
+                      key={s.id}
+                      onClick={() => setStyle(s.id)}
+                      className={`rounded-xl text-left transition-all overflow-hidden ${
+                        selected
+                          ? "ring-2 ring-primary shadow-sm"
+                          : "border border-border hover:border-primary/30"
+                      }`}
+                    >
+                      {/* Mini preview swatch */}
+                      <div className="h-16 relative" style={{ background: s.colors.bg }}>
+                        {/* Fake card */}
+                        <div
+                          className="absolute top-3 left-3 right-3 h-7 rounded"
+                          style={{
+                            background: s.id === "standard" ? "rgba(255,255,255,0.7)" : "#fff",
+                            border: s.id === "playful" ? `2px solid ${s.colors.primary}30` : `1px solid ${s.colors.text}10`,
+                            borderRadius: s.id === "playful" ? 10 : s.id === "professional" ? 4 : 6,
+                            backdropFilter: s.id === "standard" ? "blur(4px)" : undefined,
+                          }}
+                        />
+                        {/* Color bar */}
+                        <div className="absolute bottom-0 left-0 right-0 h-1 flex">
+                          <div className="flex-1" style={{ background: s.colors.primary }} />
+                          <div className="flex-1" style={{ background: s.colors.accent }} />
+                        </div>
+                      </div>
+                      {/* Info */}
+                      <div className="p-3">
+                        <span className={`text-sm font-semibold ${selected ? "text-primary" : "text-foreground"}`}>
+                          {s.name}
+                        </span>
+                        <p className="text-xs text-muted-foreground mt-0.5">{s.tagline}</p>
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {s.traits.map((t, i) => (
+                            <span
+                              key={i}
+                              className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground"
+                            >
+                              {t}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
-          <div style={{ marginBottom: 16, fontSize: 16, fontWeight: 600 }}>
-            What animation do you want to create?
-          </div>
-          <textarea
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder='e.g. "Create a 10-second scene showing three stat cards bouncing in with large numbers on a dark background..."'
-          />
-          <div style={{ display: "flex", gap: 16, marginTop: 16, alignItems: "center" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <label style={{ fontSize: 13, fontWeight: 600, color: "var(--muted-fg)" }}>Duration</label>
-              <input
-                type="number"
-                min="3"
-                max="60"
-                value={duration}
-                onChange={(e) => setDuration(e.target.value)}
-                placeholder="auto"
-                style={{
-                  width: 70, padding: "8px 10px", borderRadius: 8,
-                  border: "1px solid var(--border)", background: "var(--muted)",
-                  color: "var(--foreground)", fontSize: 14, fontFamily: "monospace",
-                }}
+            <Separator />
+
+            {/* Prompt */}
+            <div>
+              <Label htmlFor="prompt" className="text-sm font-semibold mb-2 block">
+                What animation do you want to create?
+              </Label>
+              <Textarea
+                id="prompt"
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder='e.g. "Show how a neural network learns to recognize a cat with bouncy nodes and a confidence counter..."'
+                className="min-h-[120px] resize-y"
               />
-              <span style={{ fontSize: 13, color: "var(--muted-fg)" }}>sec</span>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <label style={{ fontSize: 13, fontWeight: 600, color: "var(--muted-fg)" }}>FPS</label>
-              <select
-                value={fpsOption}
-                onChange={(e) => setFpsOption(Number(e.target.value))}
-                style={{
-                  padding: "8px 10px", borderRadius: 8,
-                  border: "1px solid var(--border)", background: "var(--muted)",
-                  color: "var(--foreground)", fontSize: 14,
-                }}
-              >
-                <option value={30}>30</option>
-                <option value={60}>60</option>
-              </select>
-            </div>
-          </div>
 
-          <div style={{ marginTop: 16 }}>
-            <button className="btn btn-primary" onClick={handleGeneratePlan} disabled={!prompt.trim()}>
+            {/* Parameters */}
+            <div className="flex gap-4 items-end">
+              <div>
+                <Label htmlFor="duration" className="text-xs text-muted-foreground flex items-center gap-1 mb-1.5">
+                  <Timer size={12} /> Duration
+                </Label>
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    id="duration"
+                    type="number"
+                    min={3}
+                    max={60}
+                    value={duration}
+                    onChange={(e) => setDuration(e.target.value)}
+                    placeholder="auto"
+                    className="font-mono w-20"
+                  />
+                  <span className="text-xs text-muted-foreground">sec</span>
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1.5 block">FPS</Label>
+                <Select value={String(fpsOption)} onValueChange={(v) => setFpsOption(Number(v))}>
+                  <SelectTrigger className="w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="30">30</SelectItem>
+                    <SelectItem value="60">60</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <Button onClick={handleGeneratePlan} disabled={!prompt.trim()} size="lg" className="w-full">
               Generate Plan
-            </button>
-          </div>
-        </div>
+              <ArrowRight size={16} weight="bold" />
+            </Button>
+          </CardContent>
+        </Card>
       )}
 
       {/* PLANNING */}
       {state === "planning" && (
-        <div className="card">
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-            <div className="spinner" />
-            <span style={{ fontSize: 14, fontWeight: 700, color: "var(--muted-fg)" }}>
-              Planning your animation...
-            </span>
-          </div>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2.5 mb-4">
+              <SpinnerGap size={18} className="animate-spin text-primary" />
+              <span className="text-sm font-semibold text-muted-foreground">Planning your animation...</span>
+            </div>
 
-          {planPreview && (planPreview.sceneName || planPreview.phases) ? (
-            <div style={{ opacity: 0.85 }}>
-              {planPreview.sceneName && (
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                  <div>
-                    <div style={{ fontSize: 18, fontWeight: 700 }}>{planPreview.sceneName}</div>
-                    {planPreview.description && (
-                      <div style={{ fontSize: 14, color: "var(--muted-fg)", marginTop: 4 }}>{planPreview.description}</div>
-                    )}
-                  </div>
-                  {planPreview.durationSeconds && (
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <span className="badge badge-info">{planPreview.durationSeconds}s</span>
-                      {planPreview.fps && <span className="badge badge-info">{planPreview.fps}fps</span>}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {planPreview.phases && planPreview.phases.length > 0 && (
-                <div style={{ marginBottom: 16 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: "var(--muted-fg)", marginBottom: 12, textTransform: "uppercase", letterSpacing: 1 }}>
-                    Phases
-                  </div>
-                  {planPreview.phases.map((phase, i) => (
-                    <div key={i} style={{ padding: "12px 16px", borderRadius: 8, background: "var(--muted)", marginBottom: 8, borderLeft: "3px solid var(--primary)" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between" }}>
-                        <span style={{ fontWeight: 600, fontSize: 14 }}>{phase.name}</span>
-                        {phase.startSecond != null && phase.endSecond != null && (
-                          <span style={{ fontSize: 12, color: "var(--muted-fg)", fontFamily: "monospace" }}>
-                            {phase.startSecond}s - {phase.endSecond}s
-                          </span>
-                        )}
-                      </div>
-                      {phase.description && (
-                        <div style={{ fontSize: 13, color: "var(--muted-fg)", marginTop: 4 }}>{phase.description}</div>
+            {planPreview && (planPreview.sceneName || planPreview.phases) ? (
+              <div className="opacity-85 space-y-4">
+                {planPreview.sceneName && (
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="text-lg font-bold">{planPreview.sceneName}</h3>
+                      {planPreview.description && (
+                        <p className="text-sm text-muted-foreground mt-1">{planPreview.description}</p>
                       )}
                     </div>
-                  ))}
-                </div>
-              )}
+                    {planPreview.durationSeconds && (
+                      <div className="flex gap-1.5">
+                        <Badge variant="secondary">{planPreview.durationSeconds}s</Badge>
+                        {planPreview.fps && <Badge variant="secondary">{planPreview.fps}fps</Badge>}
+                      </div>
+                    )}
+                  </div>
+                )}
 
-              {planPreview.visualElements && planPreview.visualElements.length > 0 && (
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: "var(--muted-fg)", marginBottom: 12, textTransform: "uppercase", letterSpacing: 1 }}>
-                    Visual Elements
+                {planPreview.phases && planPreview.phases.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Phases</p>
+                    <div className="space-y-2">
+                      {planPreview.phases.map((phase, i) => (
+                        <div key={i} className="p-3 rounded-lg bg-muted/50 border-l-2 border-primary">
+                          <div className="flex justify-between">
+                            <span className="text-sm font-semibold">{phase.name}</span>
+                            {phase.startSecond != null && phase.endSecond != null && (
+                              <span className="text-xs font-mono text-muted-foreground">
+                                {phase.startSecond}s - {phase.endSecond}s
+                              </span>
+                            )}
+                          </div>
+                          {phase.description && (
+                            <p className="text-xs text-muted-foreground mt-1">{phase.description}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                    {planPreview.visualElements.map((el, i) => (
-                      <span key={i} style={{ padding: "6px 14px", borderRadius: 6, background: "rgba(168,85,247,0.15)", border: "1px solid rgba(168,85,247,0.3)", fontSize: 13, fontWeight: 600, color: "var(--accent)" }}>
-                        {el.name}{el.type ? ` (${el.type})` : ""}
-                      </span>
-                    ))}
+                )}
+
+                {planPreview.visualElements && planPreview.visualElements.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Visual Elements</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {planPreview.visualElements.map((el, i) => (
+                        <Badge key={i} variant="outline" className="text-xs">
+                          {el.name}{el.type ? ` (${el.type})` : ""}
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div style={{ fontSize: 13, color: "var(--muted-fg)" }}>
-              Designing phases, timing, and visual elements...
-            </div>
-          )}
-        </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Designing phases, timing, and visual elements...</p>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* REVIEWING */}
       {state === "reviewing" && plan && (
-        <div className="card">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-            <div>
-              <div style={{ fontSize: 18, fontWeight: 700 }}>{plan.sceneName}</div>
-              <div style={{ fontSize: 14, color: "var(--muted-fg)", marginTop: 4 }}>{plan.description}</div>
-            </div>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <input
+        <Card>
+          <CardHeader>
+            <div className="flex justify-between items-start">
+              <div>
+                <CardTitle>{plan.sceneName}</CardTitle>
+                <CardDescription className="mt-1">{plan.description}</CardDescription>
+              </div>
+              <div className="flex gap-2 items-center">
+                <Input
                   type="number"
                   min={1}
                   max={60}
                   value={plan.durationSeconds}
                   onChange={(e) => updatePlanDuration(Number(e.target.value))}
-                  style={{
-                    width: 44, padding: "4px 6px", borderRadius: 6, textAlign: "center",
-                    border: "1px solid rgba(0,212,255,0.3)", background: "rgba(0,212,255,0.15)",
-                    color: "var(--primary)", fontSize: 12, fontWeight: 700, fontFamily: "monospace",
-                  }}
+                  className="w-14 h-7 text-center text-xs font-mono"
                 />
-                <span style={{ fontSize: 12, fontWeight: 700, color: "var(--primary)" }}>s</span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <select
-                  value={plan.fps}
-                  onChange={(e) => updatePlanFps(Number(e.target.value))}
-                  style={{
-                    padding: "4px 6px", borderRadius: 6,
-                    border: "1px solid rgba(0,212,255,0.3)", background: "rgba(0,212,255,0.15)",
-                    color: "var(--primary)", fontSize: 12, fontWeight: 700,
-                  }}
-                >
-                  <option value={30}>30</option>
-                  <option value={60}>60</option>
-                </select>
-                <span style={{ fontSize: 12, fontWeight: 700, color: "var(--primary)" }}>fps</span>
+                <span className="text-xs text-muted-foreground">s</span>
+                <Select value={String(plan.fps)} onValueChange={(v) => updatePlanFps(Number(v))}>
+                  <SelectTrigger className="w-16 h-7 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="30">30</SelectItem>
+                    <SelectItem value="60">60</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span className="text-xs text-muted-foreground">fps</span>
               </div>
             </div>
-          </div>
-
-          {plan.phases && plan.phases.length > 0 && <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "var(--muted-fg)", marginBottom: 12, textTransform: "uppercase", letterSpacing: 1 }}>
-              Phases
-            </div>
-            {plan.phases.map((phase, i) => (
-              <div key={i} style={{ padding: "12px 16px", borderRadius: 8, background: "var(--muted)", marginBottom: 8, borderLeft: "3px solid var(--primary)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ fontWeight: 600, fontSize: 14 }}>{phase.name}</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <input
-                      type="number"
-                      min={0}
-                      step={0.5}
-                      value={phase.startSecond}
-                      onChange={(e) => updatePhaseTime(i, "startSecond", Number(e.target.value))}
-                      style={{
-                        width: 40, padding: "2px 4px", borderRadius: 4, textAlign: "center",
-                        border: "1px solid var(--border)", background: "transparent",
-                        color: "var(--muted-fg)", fontSize: 12, fontFamily: "monospace",
-                      }}
-                    />
-                    <span style={{ fontSize: 12, color: "var(--muted-fg)" }}>-</span>
-                    <input
-                      type="number"
-                      min={0}
-                      step={0.5}
-                      value={phase.endSecond}
-                      onChange={(e) => updatePhaseTime(i, "endSecond", Number(e.target.value))}
-                      style={{
-                        width: 40, padding: "2px 4px", borderRadius: 4, textAlign: "center",
-                        border: "1px solid var(--border)", background: "transparent",
-                        color: "var(--muted-fg)", fontSize: 12, fontFamily: "monospace",
-                      }}
-                    />
-                    <span style={{ fontSize: 12, color: "var(--muted-fg)" }}>s</span>
-                  </div>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {/* Phases */}
+            {plan.phases && plan.phases.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Phases</p>
+                <div className="space-y-2">
+                  {plan.phases.map((phase, i) => (
+                    <div key={i} className="p-3 rounded-lg bg-muted/50 border-l-2 border-primary">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-semibold">{phase.name}</span>
+                        <div className="flex items-center gap-1">
+                          <Input
+                            type="number"
+                            min={0}
+                            step={0.5}
+                            value={phase.startSecond}
+                            onChange={(e) => updatePhaseTime(i, "startSecond", Number(e.target.value))}
+                            className="w-12 h-6 text-center text-xs font-mono p-0"
+                          />
+                          <span className="text-xs text-muted-foreground">-</span>
+                          <Input
+                            type="number"
+                            min={0}
+                            step={0.5}
+                            value={phase.endSecond}
+                            onChange={(e) => updatePhaseTime(i, "endSecond", Number(e.target.value))}
+                            className="w-12 h-6 text-center text-xs font-mono p-0"
+                          />
+                          <span className="text-xs text-muted-foreground">s</span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">{phase.description}</p>
+                    </div>
+                  ))}
                 </div>
-                <div style={{ fontSize: 13, color: "var(--muted-fg)", marginTop: 4 }}>{phase.description}</div>
               </div>
-            ))}
-          </div>}
+            )}
 
-          {plan.visualElements && plan.visualElements.length > 0 && <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "var(--muted-fg)", marginBottom: 12, textTransform: "uppercase", letterSpacing: 1 }}>
-              Visual Elements
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {plan.visualElements.map((el, i) => (
-                <span key={i} style={{ padding: "6px 14px", borderRadius: 6, background: "rgba(168,85,247,0.15)", border: "1px solid rgba(168,85,247,0.3)", fontSize: 13, fontWeight: 600, color: "var(--accent)" }}>
-                  {el.name} ({el.type})
-                </span>
-              ))}
-            </div>
-          </div>}
+            {/* Visual Elements */}
+            {plan.visualElements && plan.visualElements.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Visual Elements</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {plan.visualElements.map((el, i) => (
+                    <Badge key={i} variant="outline" className="text-xs">
+                      {el.name} ({el.type})
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
 
-          <div style={{ marginBottom: 20 }}>
-            <textarea
+            <Separator />
+
+            {/* Feedback */}
+            <Textarea
               value={feedback}
               onChange={(e) => setFeedback(e.target.value)}
-              placeholder="Suggest changes... (e.g. &quot;make the token split more dramatic&quot;, &quot;add a shake effect when overflow happens&quot;)"
-              style={{ minHeight: 80 }}
+              placeholder='Suggest changes... (e.g. "make the token split more dramatic", "add a shake effect when overflow happens")'
+              className="min-h-[80px] resize-y"
             />
-          </div>
 
-          <div style={{ display: "flex", gap: 12 }}>
-            <button className="btn btn-success" onClick={handleApproveAndGenerate}>
-              Approve & Generate Code
-            </button>
-            <button
-              className="btn btn-primary"
-              onClick={handleRevisePlan}
-              disabled={!feedback.trim()}
-            >
-              Revise Plan
-            </button>
-            <button className="btn btn-outline" onClick={handleReset}>Start Over</button>
-          </div>
-        </div>
+            {/* Actions */}
+            <div className="flex gap-3">
+              <Button onClick={handleApproveAndGenerate} className="bg-success text-white hover:bg-success/80">
+                <CheckCircle size={16} weight="bold" />
+                Approve & Generate
+              </Button>
+              <Button variant="outline" onClick={handleRevisePlan} disabled={!feedback.trim()}>
+                Revise Plan
+              </Button>
+              <Button variant="ghost" onClick={handleReset}>Start Over</Button>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* GENERATING */}
       {state === "generating" && (
-        <div className="card">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div className="spinner" />
-              <span style={{ fontSize: 14, fontWeight: 700, color: "var(--muted-fg)" }}>
-                Generating code...
-              </span>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex justify-between items-center mb-3">
+              <div className="flex items-center gap-2.5">
+                <SpinnerGap size={18} className="animate-spin text-primary" />
+                <span className="text-sm font-semibold text-muted-foreground">Generating code...</span>
+              </div>
+              {streamingText && (
+                <Badge variant="secondary" className="font-mono text-xs">
+                  {streamingText.split("\n").length} lines
+                </Badge>
+              )}
             </div>
-            {streamingText && (
-              <span style={{ fontSize: 12, color: "var(--muted-fg)", fontFamily: "monospace" }}>
-                {streamingText.split("\n").length} lines
-              </span>
-            )}
-          </div>
-          <div ref={streamRef} className="code-block" style={{ maxHeight: 400 }}>
-            {streamingText || "..."}
-          </div>
-        </div>
+            <div
+              ref={streamRef}
+              className="rounded-lg border bg-muted/30 p-4 font-mono text-xs leading-relaxed overflow-auto max-h-[400px] whitespace-pre-wrap break-words text-muted-foreground"
+            >
+              {streamingText || "..."}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* WRITING */}
       {state === "writing" && (
-        <div className="card" style={{ textAlign: "center", padding: 48 }}>
-          <div className="spinner" />
-          <div style={{ marginTop: 16, fontSize: 16, fontWeight: 600 }}>
-            Writing to disk & validating TypeScript...
-          </div>
-        </div>
+        <Card>
+          <CardContent className="py-12 text-center">
+            <SpinnerGap size={24} className="animate-spin text-primary mx-auto" />
+            <p className="mt-4 text-sm font-semibold">Writing to disk & validating TypeScript...</p>
+          </CardContent>
+        </Card>
       )}
 
       {/* DONE */}
       {state === "done" && plan && (
-        <div className="card">
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-            <span className="badge badge-success">Success</span>
-            {fixed && <span className="badge badge-info">Auto-fixed</span>}
-          </div>
-          <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>{plan.sceneName} is ready!</div>
-          <div style={{ fontSize: 14, color: "var(--muted-fg)", marginBottom: 20 }}>
-            Written to: <code style={{ color: "var(--primary)" }}>{scenePath}</code>
-          </div>
-
-          <div style={{ padding: 16, borderRadius: 10, background: "var(--muted)", border: "1px solid var(--border)", marginBottom: 16 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>Preview:</div>
-            <div className="code-block" style={{ maxHeight: 60 }}>cd remotion{"\n"}npx remotion studio</div>
-            <div style={{ fontSize: 13, color: "var(--muted-fg)", marginTop: 8 }}>
-              Select <strong style={{ color: "var(--primary)" }}>{plan.sceneName}</strong> from the Generated folder.
+        <Card>
+          <CardContent className="pt-6 space-y-5">
+            <div className="flex items-center gap-2">
+              <Badge className="bg-success/10 text-success border-success/20">Success</Badge>
+              {fixed && <Badge variant="secondary">Auto-fixed</Badge>}
             </div>
-          </div>
 
-          <div style={{ padding: 16, borderRadius: 10, background: "var(--muted)", border: "1px solid var(--border)", marginBottom: 16 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>Render:</div>
-            <div className="code-block" style={{ maxHeight: 40 }}>npx remotion render {plan.sceneName} out/{plan.sceneName}.mp4</div>
-          </div>
+            <div>
+              <h3 className="text-lg font-bold">{plan.sceneName} is ready!</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Written to: <code className="text-primary text-xs">{scenePath}</code>
+              </p>
+            </div>
 
-          <details style={{ marginBottom: 20 }}>
-            <summary style={{ cursor: "pointer", fontSize: 14, fontWeight: 600, color: "var(--muted-fg)" }}>
-              View code ({code.split("\n").length} lines)
-            </summary>
-            <div className="code-block" style={{ marginTop: 8, maxHeight: 500 }}>{code}</div>
-          </details>
+            <div className="rounded-lg border bg-muted/30 p-4">
+              <p className="text-sm font-semibold mb-2">Preview</p>
+              <div className="rounded-md border bg-background p-3 font-mono text-xs text-muted-foreground whitespace-pre">
+                cd remotion{"\n"}npx remotion studio
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Select <strong className="text-primary">{plan.sceneName}</strong> from the Generated folder.
+              </p>
+            </div>
 
-          <button className="btn btn-primary" onClick={handleReset}>Create Another</button>
-        </div>
+            <details className="group">
+              <summary className="cursor-pointer text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors">
+                Render to video
+              </summary>
+              <div className="mt-2 rounded-md border bg-background p-3 font-mono text-xs text-muted-foreground whitespace-pre">
+                npx remotion render {plan.sceneName} out/{plan.sceneName}.mp4
+              </div>
+            </details>
+
+            <details className="group">
+              <summary className="cursor-pointer text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors">
+                View code ({code.split("\n").length} lines)
+              </summary>
+              <div className="mt-2 rounded-lg border bg-muted/30 p-4 font-mono text-xs leading-relaxed overflow-auto max-h-[500px] whitespace-pre-wrap break-words text-muted-foreground">
+                {code}
+              </div>
+            </details>
+
+            <Button onClick={handleReset}>Create Another</Button>
+          </CardContent>
+        </Card>
       )}
 
       {/* ERROR */}
       {state === "error" && (
-        <div className="card" style={{ borderTop: "3px solid var(--destructive)" }}>
-          <span className="badge badge-error" style={{ marginBottom: 16 }}>Error</span>
-          <div style={{ fontSize: 14, color: "var(--destructive)", marginBottom: 16 }}>{error}</div>
-          {code && (
-            <details style={{ marginBottom: 16 }}>
-              <summary style={{ cursor: "pointer", fontSize: 13, color: "var(--muted-fg)" }}>View code</summary>
-              <div className="code-block" style={{ marginTop: 8 }}>{code}</div>
-            </details>
-          )}
-          <button className="btn btn-primary" onClick={handleReset}>Start Over</button>
-        </div>
+        <Card className="border-destructive/30">
+          <CardContent className="pt-6 space-y-4">
+            <Badge variant="destructive">
+              <Warning size={12} weight="bold" />
+              Error
+            </Badge>
+            <p className="text-sm text-destructive">{error}</p>
+            {code && (
+              <details>
+                <summary className="cursor-pointer text-xs font-semibold text-muted-foreground">View code</summary>
+                <div className="mt-2 rounded-lg border bg-muted/30 p-4 font-mono text-xs leading-relaxed overflow-auto max-h-[400px] whitespace-pre-wrap break-words text-muted-foreground">
+                  {code}
+                </div>
+              </details>
+            )}
+            <Button onClick={handleReset}>Start Over</Button>
+          </CardContent>
+        </Card>
       )}
     </div>
   );
