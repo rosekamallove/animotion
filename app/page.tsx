@@ -48,7 +48,56 @@ const steps = [
   { key: "done", label: "4. Done" },
 ];
 
+const STORAGE_KEY = "animotion_session";
+
+interface SessionSnapshot {
+  state: AppState;
+  style: StylePreset;
+  prompt: string;
+  plan: AnimationPlan | null;
+  code: string;
+  error: string;
+  scenePath: string;
+  fixed: boolean;
+  duration: string;
+  fpsOption: number;
+}
+
+function loadSession(): SessionSnapshot | null {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as SessionSnapshot;
+  } catch {
+    return null;
+  }
+}
+
+function saveSession(snapshot: SessionSnapshot) {
+  try {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+  } catch {
+    // Storage full or unavailable — ignore
+  }
+}
+
+function clearSession() {
+  try {
+    sessionStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Ignore
+  }
+}
+
+/** Mid-stream states can't be resumed — snap back to the last safe state */
+function safeState(s: AppState): AppState {
+  if (s === "planning") return "idle";
+  if (s === "generating" || s === "writing") return "reviewing";
+  return s;
+}
+
 export default function Home() {
+  const [restored, setRestored] = useState(false);
   const [state, setState] = useState<AppState>("idle");
   const [style, setStyle] = useState<StylePreset>("standard");
   const [prompt, setPrompt] = useState("");
@@ -63,6 +112,31 @@ export default function Home() {
   const [fpsOption, setFpsOption] = useState<number>(30);
   const [feedback, setFeedback] = useState("");
   const streamRef = useRef<HTMLDivElement>(null);
+
+  // Restore session on mount
+  useEffect(() => {
+    const saved = loadSession();
+    if (saved) {
+      const safe = safeState(saved.state);
+      setState(safe);
+      setStyle(saved.style);
+      setPrompt(saved.prompt);
+      setPlan(saved.plan);
+      setCode(saved.code);
+      setError(saved.error);
+      setScenePath(saved.scenePath);
+      setFixed(saved.fixed);
+      setDuration(saved.duration);
+      setFpsOption(saved.fpsOption);
+    }
+    setRestored(true);
+  }, []);
+
+  // Save session on meaningful state changes
+  useEffect(() => {
+    if (!restored) return;
+    saveSession({ state, style, prompt, plan, code, error, scenePath, fixed, duration, fpsOption });
+  }, [restored, state, style, prompt, plan, code, error, scenePath, fixed, duration, fpsOption]);
 
   useEffect(() => {
     if (streamRef.current) {
@@ -209,6 +283,7 @@ export default function Home() {
   };
 
   const handleReset = () => {
+    clearSession();
     setState("idle");
     setStyle("standard");
     setPrompt("");
