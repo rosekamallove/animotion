@@ -15,13 +15,18 @@ export async function POST(req: NextRequest) {
 
     const readable = new ReadableStream({
       start(controller) {
-        stream.on("inputJson", (partialJson) => {
+        let closed = false;
+
+        stream.on("inputJson", (partialJson, jsonSnapshot) => {
+          if (closed) return;
           controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ type: "delta", text: partialJson })}\n\n`)
+            encoder.encode(`data: ${JSON.stringify({ type: "delta", text: partialJson, snapshot: jsonSnapshot })}\n\n`)
           );
         });
 
         stream.on("finalMessage", (message) => {
+          if (closed) return;
+          closed = true;
           const toolBlock = message.content.find((b) => b.type === "tool_use");
           if (toolBlock && toolBlock.type === "tool_use") {
             controller.enqueue(
@@ -36,6 +41,8 @@ export async function POST(req: NextRequest) {
         });
 
         stream.on("error", (err) => {
+          if (closed) return;
+          closed = true;
           controller.enqueue(
             encoder.encode(`data: ${JSON.stringify({ type: "error", error: err.message })}\n\n`)
           );

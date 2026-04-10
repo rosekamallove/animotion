@@ -19,7 +19,10 @@ export async function POST(req: NextRequest) {
 
     const readable = new ReadableStream({
       start(controller) {
+        let closed = false;
+
         stream.on("text", (text) => {
+          if (closed) return;
           fullCode += text;
           controller.enqueue(
             encoder.encode(`data: ${JSON.stringify({ type: "delta", text })}\n\n`)
@@ -27,6 +30,8 @@ export async function POST(req: NextRequest) {
         });
 
         stream.on("finalMessage", () => {
+          if (closed) return;
+          closed = true;
           // Strip markdown fences if present
           let code = fullCode.trim();
           if (code.startsWith("```")) {
@@ -40,6 +45,8 @@ export async function POST(req: NextRequest) {
         });
 
         stream.on("error", (err) => {
+          if (closed) return;
+          closed = true;
           controller.enqueue(
             encoder.encode(`data: ${JSON.stringify({ type: "error", error: err.message })}\n\n`)
           );

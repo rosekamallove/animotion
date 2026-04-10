@@ -58,6 +58,7 @@ export default function Home() {
   const [scenePath, setScenePath] = useState("");
   const [fixed, setFixed] = useState(false);
   const [streamingText, setStreamingText] = useState("");
+  const [planPreview, setPlanPreview] = useState<Partial<AnimationPlan> | null>(null);
   const streamRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -69,7 +70,7 @@ export default function Home() {
   async function consumeSSE(
     url: string,
     body: object,
-    onDelta: (text: string) => void,
+    onDelta: (text: string, snapshot?: unknown) => void,
   ): Promise<{ type: string; [key: string]: unknown }> {
     const res = await fetch(url, {
       method: "POST",
@@ -100,7 +101,7 @@ export default function Home() {
           try {
             const data = JSON.parse(line.slice(6));
             if (data.type === "delta") {
-              onDelta(data.text);
+              onDelta(data.text, data.snapshot);
             } else {
               result = data;
             }
@@ -119,15 +120,19 @@ export default function Home() {
     setState("planning");
     setError("");
     setStreamingText("");
+    setPlanPreview(null);
 
     try {
       let accumulated = "";
       const result = await consumeSSE(
         "/api/generate-plan",
         { prompt, style },
-        (text) => {
+        (text, snapshot) => {
           accumulated += text;
           setStreamingText(accumulated);
+          if (snapshot && typeof snapshot === "object") {
+            setPlanPreview(snapshot as Partial<AnimationPlan>);
+          }
         }
       );
 
@@ -136,6 +141,7 @@ export default function Home() {
       }
 
       setPlan(result.plan as AnimationPlan);
+      setPlanPreview(null);
       setStreamingText("");
       setState("reviewing");
     } catch (err: unknown) {
@@ -209,6 +215,7 @@ export default function Home() {
     setScenePath("");
     setFixed(false);
     setStreamingText("");
+    setPlanPreview(null);
   };
 
   const getStepClass = (stepKey: string) => {
@@ -289,15 +296,69 @@ export default function Home() {
       {/* PLANNING */}
       {state === "planning" && (
         <div className="card">
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
             <div className="spinner" />
             <span style={{ fontSize: 14, fontWeight: 700, color: "var(--muted-fg)" }}>
               Planning your animation...
             </span>
           </div>
-          {streamingText ? (
-            <div ref={streamRef} className="code-block" style={{ maxHeight: 300, fontSize: 12, opacity: 0.7 }}>
-              {streamingText}
+
+          {planPreview && (planPreview.sceneName || planPreview.phases) ? (
+            <div style={{ opacity: 0.85 }}>
+              {planPreview.sceneName && (
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                  <div>
+                    <div style={{ fontSize: 18, fontWeight: 700 }}>{planPreview.sceneName}</div>
+                    {planPreview.description && (
+                      <div style={{ fontSize: 14, color: "var(--muted-fg)", marginTop: 4 }}>{planPreview.description}</div>
+                    )}
+                  </div>
+                  {planPreview.durationSeconds && (
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <span className="badge badge-info">{planPreview.durationSeconds}s</span>
+                      {planPreview.fps && <span className="badge badge-info">{planPreview.fps}fps</span>}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {planPreview.phases && planPreview.phases.length > 0 && (
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "var(--muted-fg)", marginBottom: 12, textTransform: "uppercase", letterSpacing: 1 }}>
+                    Phases
+                  </div>
+                  {planPreview.phases.map((phase, i) => (
+                    <div key={i} style={{ padding: "12px 16px", borderRadius: 8, background: "var(--muted)", marginBottom: 8, borderLeft: "3px solid var(--primary)" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <span style={{ fontWeight: 600, fontSize: 14 }}>{phase.name}</span>
+                        {phase.startSecond != null && phase.endSecond != null && (
+                          <span style={{ fontSize: 12, color: "var(--muted-fg)", fontFamily: "monospace" }}>
+                            {phase.startSecond}s - {phase.endSecond}s
+                          </span>
+                        )}
+                      </div>
+                      {phase.description && (
+                        <div style={{ fontSize: 13, color: "var(--muted-fg)", marginTop: 4 }}>{phase.description}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {planPreview.visualElements && planPreview.visualElements.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "var(--muted-fg)", marginBottom: 12, textTransform: "uppercase", letterSpacing: 1 }}>
+                    Visual Elements
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {planPreview.visualElements.map((el, i) => (
+                      <span key={i} style={{ padding: "6px 14px", borderRadius: 6, background: "rgba(168,85,247,0.15)", border: "1px solid rgba(168,85,247,0.3)", fontSize: 13, fontWeight: 600, color: "var(--accent)" }}>
+                        {el.name}{el.type ? ` (${el.type})` : ""}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div style={{ fontSize: 13, color: "var(--muted-fg)" }}>
