@@ -171,10 +171,64 @@ Use `sessionStorage` (per-tab, clears on tab close) to persist the working sessi
 
 ---
 
+## Phase 6: Groups — Shared Context + Sidebar Layout
+
+### Goal
+Create groups of related animations (like TurboQuant) where every scene shares the same design language. Each new scene sees code from previous scenes in the group via a rolling window.
+
+### Layout
+Sidebar (280px) + main area. Sidebar shows groups with collapsible scene lists, "+ New Scene" / "+ New Group" buttons. Main area shows: welcome, group overview, scene preview, or the creation flow depending on selection.
+
+### Data Model
+`remotion/src/generated/groups.json` stores groups with their scenes. Files stay flat in `generated/`. Root.tsx registers group scenes in `<Folder name={groupName}>`.
+
+```json
+{
+  "groups": [
+    { "id": "turbo-quant", "name": "TurboQuant", "style": "standard", "scenes": [...] }
+  ],
+  "standalone": [...]
+}
+```
+
+### Context Passing (Rolling Window)
+- Scene 1: No group context
+- Scene 2: Full code of Scene 1
+- Scene 3: Full code of Scenes 1 + 2
+- Scene 4+: Full code of N-2 and N-1, older scenes as summaries (name + description)
+
+Injected as `## GROUP CONTEXT` section in the code system prompt with instruction to match design language.
+
+### New Files
+- `lib/groups.ts` — types, CRUD, context reader (reads .tsx files for rolling window)
+- `app/api/groups/route.ts` — GET (list), POST (create)
+- `app/api/scene-code/route.ts` — GET scene code by name
+- `app/components/Sidebar.tsx` — group/scene navigation
+- `app/components/SceneCreator.tsx` — extracted creation flow from page.tsx
+- `app/components/SceneViewer.tsx` — preview existing scene
+- `app/components/GroupOverview.tsx` — group details + scene list
+
+### Modified Files
+- `app/page.tsx` — rewrite as sidebar + main area coordinator
+- `lib/remotion-writer.ts` — group-aware writeScene, Root.tsx folders
+- `lib/prompts.ts` — add GROUP CONTEXT section
+- `lib/claude.ts` — pass groupContext to streamCode
+- `app/api/generate-code/route.ts` — accept groupId, read context
+- `app/api/write-scene/route.ts` — accept groupId
+- `app/api/generate-plan/route.ts` — accept groupId
+
+### Implementation Order
+1. Data model + groups API
+2. Sidebar layout + component extraction
+3. Wire context into code generation
+
+---
+
 ## Implementation Order
 
-1. **Phase 1: Style Guides** — style presets, prompt injection, UI selector ✅
-2. **Phase 2: Plan Review** — feedback loop, plan revision API, editable timing, initial params ✅
-3. **Phase 3: Preview** — iframe embed or @remotion/player
-4. **Phase 4: Rendering** — render API, 1080p/4K, download
-5. **Phase 5: State Persistence** — sessionStorage save/restore across refreshes
+1. **Phase 1: Style Guides** ✅
+2. **Phase 2: Plan Review** ✅
+3. **Phase 3: In-Browser Preview** ✅
+4. **Phase 4: Rendering (1080p)** ✅
+5. **Phase 5: State Persistence** ✅
+6. **Phase 6: Groups** — sidebar layout, shared context, rolling window ← NEXT

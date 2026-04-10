@@ -8,8 +8,16 @@ Animotion uses Claude to turn natural language prompts into React-based video an
 
 ## How it works
 
-```
-Describe it  >  Review plan  >  Approve  >  Code streams in  >  Preview plays inline
+```mermaid
+flowchart LR
+    A[Describe it] --> B[Claude plans it]
+    B --> C[You review/edit]
+    C -->|feedback| B
+    C -->|approve| D[Claude codes it]
+    D --> E[TypeScript validated]
+    E -->|errors| F[Auto-fix with Opus]
+    F --> E
+    E -->|pass| G[Preview plays inline]
 ```
 
 1. Pick a style (Professional, Playful, or Standard) and type a prompt
@@ -70,6 +78,22 @@ Three built-in styles that affect both planning and code generation:
 | **Playful** | Warm pink background, thick borders, large corners | Bouncy springs, scale pops, rotation |
 | **Standard** | Light gray, cyan/purple, glass-morphism cards | Mixed springs, grid overlay |
 
+Each preset injects its own inline theme, spring configs, and design rules into the system prompt:
+
+```mermaid
+flowchart TD
+    STYLE[Style Preset] --> THEME[Inline Theme<br/>colors, glass, gridBg]
+    STYLE --> RULES[Style Rules<br/>spring configs, layout constraints]
+    THEME --> PROMPT[Code System Prompt]
+    RULES --> PROMPT
+    EXAMPLES[2 Example Scenes] --> PROMPT
+    PATTERNS[8 Animation Patterns] --> PROMPT
+    LAYOUT[Layout Rules] --> PROMPT
+    PROMPT --> OPUS[Claude Opus 4.6]
+    PLAN[Animation Plan] --> OPUS
+    OPUS --> TSX[Generated .tsx]
+```
+
 ### Plan review pipeline
 
 - Edit overall duration and FPS directly in the review card
@@ -82,6 +106,19 @@ Three built-in styles that affect both planning and code generation:
 - Plan generation streams a live structured preview (scene name, phases, elements fill in progressively)
 - Code generation streams TSX token by token with a live line counter
 - TypeScript validation shows step-by-step progress (write > validate > auto-fix)
+
+### Write and validate pipeline
+
+```mermaid
+flowchart LR
+    W[Write .tsx to disk] --> R[Update Root.tsx<br/>+ registry + manifest]
+    R --> V{npx tsc --noEmit}
+    V -->|pass| P[Preview with<br/>@remotion/player]
+    V -->|fail| F[Opus auto-fix]
+    F --> W2[Rewrite .tsx] --> V2{tsc again}
+    V2 -->|pass| P
+    V2 -->|fail| E[Show structured<br/>error to user]
+```
 
 ### In-browser preview
 
