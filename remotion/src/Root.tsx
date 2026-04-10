@@ -18,6 +18,7 @@ import { QuantizationExplainer } from "./generated/QuantizationExplainer";
 import { LlmTokenizationExplainer } from "./generated/LlmTokenizationExplainer";
 import { NeuralNetworkCatRecognition } from "./generated/NeuralNetworkCatRecognition";
 import { MarketingFunnel } from "./generated/MarketingFunnel";
+import { LLMTokenisation } from "./generated/LLMTokenisation";
 /* ANIMOTION_IMPORTS_END */
 
 export const RemotionRoot: React.FC = () => {
@@ -149,6 +150,14 @@ export const RemotionRoot: React.FC = () => {
           id="MarketingFunnel"
           component={MarketingFunnel}
           durationInFrames={840}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="LLMTokenisation"
+          component={LLMTokenisation}
+          durationInFrames={300}
           fps={30}
           width={1920}
           height={1080}

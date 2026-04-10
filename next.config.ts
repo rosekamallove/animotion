@@ -5,7 +5,7 @@ const generatedPath = path.resolve(__dirname, "remotion/src/generated");
 const rootNodeModules = path.resolve(__dirname, "node_modules");
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["remotion", "@remotion/player", "@remotion/google-fonts"],
+  transpilePackages: ["remotion", "@remotion/player", "@remotion/google-fonts", "shiki"],
   turbopack: {
     resolveAlias: {
       "@generated": "./remotion/src/generated",

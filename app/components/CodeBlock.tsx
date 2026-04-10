@@ -24,6 +24,8 @@ export function CodeBlock({ code, language = "tsx", maxHeight = 500, showCopy = 
       theme: "github-light",
     }).then((result) => {
       if (!cancelled) setHtml(result);
+    }).catch(() => {
+      // Shiki can fail during HMR in dev — fall back to plain text
     });
     return () => { cancelled = true; };
   }, [code, language]);

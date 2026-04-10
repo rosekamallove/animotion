@@ -14,10 +14,15 @@ export function RemotionPreview({ sceneName, durationInFrames, fps }: RemotionPr
 
   // Generated components use named exports (export const SceneName = ...)
   // Player's lazyComponent expects { default: Component }, so we remap
+  // Import from the auto-generated registry (static path — Turbopack can resolve it)
+  // The registry re-exports all generated components by name
   const lazyComponent = useCallback(
     () =>
-      import(`@generated/${sceneName}`)
-        .then((mod: Record<string, React.FC>) => ({ default: mod[sceneName] }))
+      import("@generated/_registry")
+        .then((mod: Record<string, React.FC>) => {
+          if (!mod[sceneName]) throw new Error(`Component "${sceneName}" not found in registry`);
+          return { default: mod[sceneName] };
+        })
         .catch((err: Error) => {
           setError(err.message);
           throw err;

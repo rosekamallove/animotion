@@ -21,6 +21,8 @@ import {
   Play,
   FileTsx,
   Sparkle,
+  FilmStrip,
+  DownloadSimple,
 } from "@phosphor-icons/react";
 
 type AppState = "idle" | "planning" | "reviewing" | "generating" | "writing" | "done" | "error";
@@ -146,6 +148,9 @@ export default function Home() {
   const [fpsOption, setFpsOption] = useState<number>(30);
   const [feedback, setFeedback] = useState("");
   const [writeStep, setWriteStep] = useState<"writing" | "validating" | "fixing">("writing");
+  const [rendering, setRendering] = useState(false);
+  const [renderResult, setRenderResult] = useState<{ file: string; sizeMB: string } | null>(null);
+  const [renderError, setRenderError] = useState("");
   const streamRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -337,6 +342,31 @@ export default function Home() {
     setFpsOption(30);
     setFeedback("");
     setWriteStep("writing");
+    setRendering(false);
+    setRenderResult(null);
+    setRenderError("");
+  };
+
+  const handleRender = async () => {
+    if (!plan) return;
+    setRendering(true);
+    setRenderError("");
+    setRenderResult(null);
+
+    try {
+      const res = await fetch("/api/render", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ compositionId: plan.sceneName }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setRenderResult({ file: data.file, sizeMB: data.sizeMB });
+    } catch (err: unknown) {
+      setRenderError(err instanceof Error ? err.message : "Render failed");
+    } finally {
+      setRendering(false);
+    }
   };
 
   const handleRevisePlan = async () => {
@@ -868,14 +898,45 @@ export default function Home() {
               />
             </div>
 
-            <details className="group">
-              <summary className="cursor-pointer text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors">
-                Render to video
-              </summary>
-              <div className="mt-2 rounded-md border bg-background p-3 font-mono text-xs text-muted-foreground whitespace-pre">
-                cd remotion{"\n"}npx remotion render {plan.sceneName} out/{plan.sceneName}.mp4
+            {/* Render */}
+            <div className="rounded-lg border bg-muted/30 p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold">Render to MP4</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">1080p, {plan.fps}fps</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {renderResult && (
+                    <a href={renderResult.file} download>
+                      <Button variant="outline" size="sm">
+                        <DownloadSimple size={14} weight="bold" />
+                        Download ({renderResult.sizeMB} MB)
+                      </Button>
+                    </a>
+                  )}
+                  <Button
+                    size="sm"
+                    onClick={handleRender}
+                    disabled={rendering}
+                  >
+                    {rendering ? (
+                      <>
+                        <SpinnerGap size={14} className="animate-spin" />
+                        Rendering...
+                      </>
+                    ) : (
+                      <>
+                        <FilmStrip size={14} weight="bold" />
+                        {renderResult ? "Re-render" : "Render"}
+                      </>
+                    )}
+                  </Button>
+                </div>
               </div>
-            </details>
+              {renderError && (
+                <p className="text-xs text-destructive mt-2">{renderError}</p>
+              )}
+            </div>
 
             <details className="group">
               <summary className="cursor-pointer text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors">
