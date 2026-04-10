@@ -1,17 +1,56 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generatePlan } from "../../../lib/claude";
+import { streamPlan } from "../../../lib/claude";
+import type { AnimationPlan } from "../../../lib/claude";
 
 export async function POST(req: NextRequest) {
   try {
-    const { prompt } = await req.json();
+    const { prompt, style } = await req.json();
 
     if (!prompt || typeof prompt !== "string") {
       return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
     }
 
-    const plan = await generatePlan(prompt);
+    const stream = streamPlan(prompt, style || "standard");
+    const encoder = new TextEncoder();
 
-    return NextResponse.json({ plan });
+    const readable = new ReadableStream({
+      start(controller) {
+        stream.on("inputJson", (partialJson) => {
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ type: "delta", text: partialJson })}\n\n`)
+          );
+        });
+
+        stream.on("finalMessage", (message) => {
+          const toolBlock = message.content.find((b) => b.type === "tool_use");
+          if (toolBlock && toolBlock.type === "tool_use") {
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ type: "done", plan: toolBlock.input as AnimationPlan })}\n\n`)
+            );
+          } else {
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ type: "error", error: "No structured plan returned" })}\n\n`)
+            );
+          }
+          controller.close();
+        });
+
+        stream.on("error", (err) => {
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ type: "error", error: err.message })}\n\n`)
+          );
+          controller.close();
+        });
+      },
+    });
+
+    return new Response(readable, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to generate plan";
     console.error("Plan generation error:", message);

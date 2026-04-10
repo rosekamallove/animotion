@@ -1,4 +1,8 @@
-export const PLAN_SYSTEM_PROMPT = `You are an animation director who creates detailed scene plans for Remotion (React-based video framework).
+import { StylePreset, getStyleConfig } from "./styles";
+
+export function getPlanSystemPrompt(style: StylePreset = "standard"): string {
+  const config = getStyleConfig(style);
+  return `You are an animation director who creates detailed scene plans for Remotion (React-based video framework).
 
 Given a natural language description, create a structured plan for the animation.
 
@@ -6,18 +10,17 @@ Design rules:
 - All timing in seconds at 30fps
 - Keep scenes between 5-30 seconds
 - Phases should have clear staggered entrance animations with specific delays
-- Use spring animations for entrances (bouncy: damping 8-14, smooth: damping 200)
+- Use spring animations for entrances
 - Use interpolate for continuous motion, progress bars, counters, line drawing
-- Design for 1920x1080 resolution on a pure black (#000000) background
-- Dark, professional aesthetic with glass-morphism cards
-- Color palette: cyan (#00d4ff) primary, purple (#a855f7) accent, green (#22c55e) success, red (#ef4444) error, yellow (#f59e0b) warning
+${config.planDesignRules}
 - No emojis, no gradient text — use Lucide React icons and solid colors
-- Use Montserrat 700/900 for headlines, Inter 400-700 for body text
-- Monospace ('SF Mono', 'Fira Code') for numbers and code
 - Think about what makes a visually INTERESTING animation — not just text fading in, but physical transformations (shrinking blocks, scanning lasers, stacking elements, counting numbers, color-shifting bars, shaking on overflow)
 - Each phase should have a clear visual payoff, not just text appearing`;
+}
 
-export const CODE_SYSTEM_PROMPT = `You are an expert Remotion developer who creates visually stunning, production-ready animation components. Your output quality must match the examples below — professional, polished, with multi-phase animations, physical spring physics, and creative visual storytelling.
+export function getCodeSystemPrompt(style: StylePreset = "standard"): string {
+  const config = getStyleConfig(style);
+  return `You are an expert Remotion developer who creates visually stunning, production-ready animation components. Your output quality must match the examples below — professional, polished, with multi-phase animations, physical spring physics, and creative visual storytelling.
 
 ## CRITICAL RULES — VIOLATIONS WILL BREAK RENDERING
 1. ALL animations MUST use \`useCurrentFrame()\` and \`useVideoConfig()\` hooks
@@ -41,25 +44,10 @@ import { AnyIconName } from "lucide-react"; // e.g. ArrowRight, Check, X, Brain,
 
 ## INLINE THEME (copy these into EVERY component)
 \`\`\`tsx
-const colors = {
-  background: "#000000", foreground: "#e2e8f0", primary: "#00d4ff",
-  primaryLight: "#38bdf8", primaryDark: "#0284c7", accent: "#a855f7",
-  accentLight: "#c084fc", muted: "#1e293b", mutedForeground: "#94a3b8",
-  border: "#334155", success: "#22c55e", destructive: "#ef4444",
-  warning: "#f59e0b", white: "#ffffff",
-};
-
-const glass: React.CSSProperties = {
-  background: "rgba(15, 23, 42, 0.7)", backdropFilter: "blur(16px)",
-  WebkitBackdropFilter: "blur(16px)", border: "1px solid rgba(255, 255, 255, 0.1)",
-  borderRadius: 16, boxShadow: "0 4px 24px rgba(0, 0, 0, 0.3)",
-};
-
-const gridBg: React.CSSProperties = {
-  backgroundImage: "linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)",
-  backgroundSize: "60px 60px",
-};
+${config.inlineTheme}
 \`\`\`
+
+IMPORTANT: Use EXACTLY these colors and styles in your component. The examples below may show different colors — always use the theme above, NOT the colors from the examples.
 
 ## ANIMATION PATTERNS (use these exact patterns)
 \`\`\`tsx
@@ -95,6 +83,8 @@ const hue = interpolate(fill, [0, 0.5, 1], [120, 45, 0], { extrapolateLeft: "cla
 // Apply: background: \`hsl(\${hue}, 80%, 50%)\`
 \`\`\`
 
+${config.styleRules}
+
 ## EXAMPLE 1: CompressionImpact — Block shrink + stat cards + counter
 A KV cache block physically shrinks to 1/6th size, freed space lights up green, then stat cards bounce in with a counting number animation.
 \`\`\`tsx
@@ -107,6 +97,8 @@ import { Smartphone } from "lucide-react";
 const { fontFamily: montserrat } = loadMontserrat("normal", { weights: ["700", "900"], subsets: ["latin"] });
 const { fontFamily: inter } = loadInter("normal", { weights: ["400", "500", "600", "700"], subsets: ["latin"] });
 
+// NOTE: This example uses dark theme colors for demonstration.
+// In YOUR component, use the colors from the INLINE THEME section above.
 const colors = {
   background: "#000000", foreground: "#e2e8f0", primary: "#00d4ff",
   primaryLight: "#38bdf8", accent: "#a855f7", accentLight: "#c084fc",
@@ -156,7 +148,7 @@ export const CompressionImpact: React.FC = () => {
   const bottomSpring = spring({ frame, fps, config: { damping: 200 }, delay: Math.round(8.5 * fps) });
 
   return (
-    <AbsoluteFill style={{ backgroundColor: "#000000", overflow: "hidden", fontFamily: inter }}>
+    <AbsoluteFill style={{ backgroundColor: colors.background, overflow: "hidden", fontFamily: inter }}>
       <div style={{ position: "absolute", inset: 0, ...gridBg, opacity: 0.3 }} />
       <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", zIndex: 1, gap: 24 }}>
         {/* Block + freed space */}
@@ -213,6 +205,8 @@ import { loadFont as loadInter } from "@remotion/google-fonts/Inter";
 const { fontFamily: montserrat } = loadMontserrat("normal", { weights: ["700", "900"], subsets: ["latin"] });
 const { fontFamily: inter } = loadInter("normal", { weights: ["400", "500", "600", "700"], subsets: ["latin"] });
 
+// NOTE: This example uses dark theme colors for demonstration.
+// In YOUR component, use the colors from the INLINE THEME section above.
 const colors = {
   background: "#000000", foreground: "#e2e8f0", primary: "#00d4ff",
   accent: "#a855f7", accentLight: "#c084fc", muted: "#1e293b",
@@ -245,7 +239,7 @@ export const KVPairVisual: React.FC = () => {
   const vectorDims = [0.82, -0.15, 0.44, 1.07, -0.63, 0.29, -0.91, 0.56];
 
   return (
-    <AbsoluteFill style={{ backgroundColor: "#000000", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+    <AbsoluteFill style={{ backgroundColor: colors.background, alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
       <div style={{ position: "absolute", inset: 0, ...gridBg, opacity: 0.3 }} />
       <div style={{ display: "flex", alignItems: "center", gap: 40, zIndex: 1 }}>
         {/* Key box */}
@@ -283,21 +277,11 @@ export const KVPairVisual: React.FC = () => {
 };
 \`\`\`
 
-## DESIGN PRINCIPLES (learned from user feedback)
-- No emojis — use Lucide icons or styled divs
-- No gradient text — solid colors only
-- Background is always pure black #000000
-- Grid overlay at 0.3 opacity for subtle texture
-- Glass-morphism cards for containers
-- Colored top/left borders on cards to indicate type
-- Text glows via textShadow, not CSS filters
-- Bouncy springs (damping 8-14) for impactful moments, smooth springs (damping 200) for text
-- Always clamp interpolate extrapolation
-- Keep all content within 1920x1080 bounds — don't overflow
-- Stagger animations with delays, don't dump everything at once
-- Physical transformations (shrinking, scaling, shaking) > simple fades
+## DESIGN PRINCIPLES
+${config.designPrinciples}
 
 ## OUTPUT FORMAT
 Return ONLY valid TSX code. No markdown fences. No explanations. No comments before or after.
 Start with \`import React from "react";\` and end with \`};\`.
 The exported component name MUST match the sceneName from the plan.`;
+}

@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { PLAN_SYSTEM_PROMPT, CODE_SYSTEM_PROMPT } from "./prompts";
+import { getPlanSystemPrompt, getCodeSystemPrompt } from "./prompts";
+import { StylePreset } from "./styles";
 
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -75,11 +76,11 @@ const planTool = {
   },
 };
 
-export async function generatePlan(prompt: string): Promise<AnimationPlan> {
+export async function generatePlan(prompt: string, style: StylePreset = "standard"): Promise<AnimationPlan> {
   const message = await client.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 4096,
-    system: PLAN_SYSTEM_PROMPT,
+    system: getPlanSystemPrompt(style),
     tools: [planTool],
     tool_choice: { type: "tool", name: "create_animation_plan" },
     messages: [
@@ -100,12 +101,13 @@ export async function generatePlan(prompt: string): Promise<AnimationPlan> {
 
 export async function generateCode(
   plan: AnimationPlan,
-  originalPrompt: string
+  originalPrompt: string,
+  style: StylePreset = "standard"
 ): Promise<string> {
   const message = await client.messages.create({
     model: "claude-opus-4-6",
     max_tokens: 16384,
-    system: CODE_SYSTEM_PROMPT,
+    system: getCodeSystemPrompt(style),
     messages: [
       {
         role: "user",
@@ -134,14 +136,56 @@ IMPORTANT: Return ONLY the TSX code. No markdown fences, no explanations, no com
   return code;
 }
 
+export function streamPlan(prompt: string, style: StylePreset = "standard") {
+  return client.messages.stream({
+    model: "claude-sonnet-4-6",
+    max_tokens: 4096,
+    system: getPlanSystemPrompt(style),
+    tools: [planTool],
+    tool_choice: { type: "tool", name: "create_animation_plan" },
+    messages: [
+      {
+        role: "user",
+        content: `Create a detailed animation plan for:\n\n${prompt}`,
+      },
+    ],
+  });
+}
+
+export function streamCode(
+  plan: AnimationPlan,
+  originalPrompt: string,
+  style: StylePreset = "standard"
+) {
+  return client.messages.stream({
+    model: "claude-opus-4-6",
+    max_tokens: 16384,
+    system: getCodeSystemPrompt(style),
+    messages: [
+      {
+        role: "user",
+        content: `Generate a complete Remotion animation component based on this plan.
+
+Original request: "${originalPrompt}"
+
+Plan:
+${JSON.stringify(plan, null, 2)}
+
+IMPORTANT: Return ONLY the TSX code. No markdown fences, no explanations, no comments before or after the code. Start with "import" and end with "};".`,
+      },
+    ],
+  });
+}
+
 export async function fixCode(
   code: string,
-  errors: string
+  errors: string,
+  style: StylePreset = "standard"
 ): Promise<string> {
   const message = await client.messages.create({
     model: "claude-opus-4-6",
     max_tokens: 16384,
-    system: CODE_SYSTEM_PROMPT,
+    system: getCodeSystemPrompt(style),
     messages: [
       {
         role: "user",

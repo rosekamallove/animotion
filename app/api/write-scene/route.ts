@@ -4,7 +4,7 @@ import { fixCode } from "../../../lib/claude";
 
 export async function POST(req: NextRequest) {
   try {
-    const { sceneName, code, durationFrames, fps } = await req.json();
+    const { sceneName, code, durationFrames, fps, style } = await req.json();
 
     if (!sceneName || !code || !durationFrames) {
       return NextResponse.json(
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     // If TypeScript fails, attempt one fix
     if (!validation.success) {
       console.log("TypeScript validation failed, attempting fix...");
-      const fixedCode = await fixCode(code, validation.errors);
+      const fixedCode = await fixCode(code, validation.errors, style || "standard");
 
       // Rewrite with fixed code
       writeScene(sceneName, fixedCode, durationFrames, fps || 30);

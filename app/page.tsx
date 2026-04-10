@@ -1,8 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 
 type AppState = "idle" | "planning" | "reviewing" | "generating" | "writing" | "done" | "error";
+type StylePreset = "professional" | "playful" | "standard";
+
+const styleOptions: Array<{
+  id: StylePreset;
+  name: string;
+  tagline: string;
+  colors: [string, string, string];
+  bg: string;
+}> = [
+  { id: "professional", name: "Professional", tagline: "Clean, corporate, data-focused", colors: ["#2563eb", "#7c3aed", "#16a34a"], bg: "#ffffff" },
+  { id: "playful", name: "Playful", tagline: "Vibrant, bouncy, energetic", colors: ["#ec4899", "#f97316", "#14b8a6"], bg: "#fdf4ff" },
+  { id: "standard", name: "Standard", tagline: "Modern tech, cyan & purple", colors: ["#00d4ff", "#a855f7", "#22c55e"], bg: "#f8fafc" },
+];
 
 interface AnimationPlan {
   sceneName: string;
@@ -37,27 +50,93 @@ const steps = [
 
 export default function Home() {
   const [state, setState] = useState<AppState>("idle");
+  const [style, setStyle] = useState<StylePreset>("standard");
   const [prompt, setPrompt] = useState("");
   const [plan, setPlan] = useState<AnimationPlan | null>(null);
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [scenePath, setScenePath] = useState("");
   const [fixed, setFixed] = useState(false);
+  const [streamingText, setStreamingText] = useState("");
+  const streamRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (streamRef.current) {
+      streamRef.current.scrollTop = streamRef.current.scrollHeight;
+    }
+  }, [streamingText]);
+
+  async function consumeSSE(
+    url: string,
+    body: object,
+    onDelta: (text: string) => void,
+  ): Promise<{ type: string; [key: string]: unknown }> {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || "Request failed");
+    }
+
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let result: { type: string; [key: string]: unknown } = { type: "done" };
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          try {
+            const data = JSON.parse(line.slice(6));
+            if (data.type === "delta") {
+              onDelta(data.text);
+            } else {
+              result = data;
+            }
+          } catch {
+            // Ignore malformed SSE lines
+          }
+        }
+      }
+    }
+
+    return result;
+  }
 
   const handleGeneratePlan = async () => {
     if (!prompt.trim()) return;
     setState("planning");
     setError("");
+    setStreamingText("");
 
     try {
-      const res = await fetch("/api/generate-plan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setPlan(data.plan);
+      let accumulated = "";
+      const result = await consumeSSE(
+        "/api/generate-plan",
+        { prompt, style },
+        (text) => {
+          accumulated += text;
+          setStreamingText(accumulated);
+        }
+      );
+
+      if (result.type === "error") {
+        throw new Error(result.error as string);
+      }
+
+      setPlan(result.plan as AnimationPlan);
+      setStreamingText("");
       setState("reviewing");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to generate plan");
@@ -69,16 +148,26 @@ export default function Home() {
     if (!plan) return;
     setState("generating");
     setError("");
+    setStreamingText("");
 
     try {
-      const res = await fetch("/api/generate-code", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan, prompt }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setCode(data.code);
+      let accumulated = "";
+      const result = await consumeSSE(
+        "/api/generate-code",
+        { plan, prompt, style },
+        (text) => {
+          accumulated += text;
+          setStreamingText(accumulated);
+        }
+      );
+
+      if (result.type === "error") {
+        throw new Error(result.error as string);
+      }
+
+      const generatedCode = result.code as string;
+      setCode(generatedCode);
+      setStreamingText("");
 
       setState("writing");
       const writeRes = await fetch("/api/write-scene", {
@@ -86,9 +175,10 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sceneName: plan.sceneName,
-          code: data.code,
+          code: generatedCode,
           durationFrames: plan.durationFrames,
           fps: plan.fps,
+          style,
         }),
       });
       const writeData = await writeRes.json();
@@ -111,12 +201,14 @@ export default function Home() {
 
   const handleReset = () => {
     setState("idle");
+    setStyle("standard");
     setPrompt("");
     setPlan(null);
     setCode("");
     setError("");
     setScenePath("");
     setFixed(false);
+    setStreamingText("");
   };
 
   const getStepClass = (stepKey: string) => {
@@ -144,6 +236,40 @@ export default function Home() {
       {/* IDLE */}
       {state === "idle" && (
         <div className="card">
+          <div style={{ marginBottom: 12, fontSize: 14, fontWeight: 700, color: "var(--muted-fg)", textTransform: "uppercase", letterSpacing: 1 }}>
+            Style
+          </div>
+          <div style={{ display: "flex", gap: 12, marginBottom: 24 }}>
+            {styleOptions.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => setStyle(s.id)}
+                style={{
+                  flex: 1,
+                  padding: "16px 16px 14px",
+                  borderRadius: 12,
+                  border: style === s.id ? `2px solid ${s.colors[0]}` : "2px solid var(--border)",
+                  background: style === s.id ? `${s.colors[0]}12` : "var(--muted)",
+                  cursor: "pointer",
+                  textAlign: "left",
+                  transition: "border-color 0.15s, background 0.15s",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                  <div style={{ width: 28, height: 28, borderRadius: 8, background: s.bg, border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <div style={{ display: "flex", gap: 2 }}>
+                      {s.colors.map((c, i) => (
+                        <div key={i} style={{ width: 6, height: 6, borderRadius: "50%", background: c }} />
+                      ))}
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: style === s.id ? s.colors[0] : "var(--foreground)" }}>{s.name}</span>
+                </div>
+                <div style={{ fontSize: 12, color: "var(--muted-fg)", lineHeight: 1.4 }}>{s.tagline}</div>
+              </button>
+            ))}
+          </div>
+
           <div style={{ marginBottom: 16, fontSize: 16, fontWeight: 600 }}>
             What animation do you want to create?
           </div>
@@ -162,12 +288,22 @@ export default function Home() {
 
       {/* PLANNING */}
       {state === "planning" && (
-        <div className="card" style={{ textAlign: "center", padding: 48 }}>
-          <div className="spinner" />
-          <div style={{ marginTop: 16, fontSize: 16, fontWeight: 600 }}>Planning your animation...</div>
-          <div style={{ fontSize: 14, color: "var(--muted-fg)", marginTop: 8 }}>
-            Claude is designing phases, timing, and visual elements
+        <div className="card">
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+            <div className="spinner" />
+            <span style={{ fontSize: 14, fontWeight: 700, color: "var(--muted-fg)" }}>
+              Planning your animation...
+            </span>
           </div>
+          {streamingText ? (
+            <div ref={streamRef} className="code-block" style={{ maxHeight: 300, fontSize: 12, opacity: 0.7 }}>
+              {streamingText}
+            </div>
+          ) : (
+            <div style={{ fontSize: 13, color: "var(--muted-fg)" }}>
+              Designing phases, timing, and visual elements...
+            </div>
+          )}
         </div>
       )}
 
@@ -224,12 +360,34 @@ export default function Home() {
         </div>
       )}
 
-      {/* GENERATING / WRITING */}
-      {(state === "generating" || state === "writing") && (
+      {/* GENERATING */}
+      {state === "generating" && (
+        <div className="card">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div className="spinner" />
+              <span style={{ fontSize: 14, fontWeight: 700, color: "var(--muted-fg)" }}>
+                Generating code...
+              </span>
+            </div>
+            {streamingText && (
+              <span style={{ fontSize: 12, color: "var(--muted-fg)", fontFamily: "monospace" }}>
+                {streamingText.split("\n").length} lines
+              </span>
+            )}
+          </div>
+          <div ref={streamRef} className="code-block" style={{ maxHeight: 400 }}>
+            {streamingText || "..."}
+          </div>
+        </div>
+      )}
+
+      {/* WRITING */}
+      {state === "writing" && (
         <div className="card" style={{ textAlign: "center", padding: 48 }}>
           <div className="spinner" />
           <div style={{ marginTop: 16, fontSize: 16, fontWeight: 600 }}>
-            {state === "generating" ? "Generating animation code..." : "Writing to disk & validating TypeScript..."}
+            Writing to disk & validating TypeScript...
           </div>
         </div>
       )}
@@ -248,7 +406,7 @@ export default function Home() {
 
           <div style={{ padding: 16, borderRadius: 10, background: "var(--muted)", border: "1px solid var(--border)", marginBottom: 16 }}>
             <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>Preview:</div>
-            <div className="code-block" style={{ maxHeight: 60 }}>cd video-animations{"\n"}npx remotion studio</div>
+            <div className="code-block" style={{ maxHeight: 60 }}>cd remotion{"\n"}npx remotion studio</div>
             <div style={{ fontSize: 13, color: "var(--muted-fg)", marginTop: 8 }}>
               Select <strong style={{ color: "var(--primary)" }}>{plan.sceneName}</strong> from the Generated folder.
             </div>
