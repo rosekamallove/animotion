@@ -17,6 +17,7 @@ import { NeuralNetworkTextProcessing } from "./generated/NeuralNetworkTextProces
 import { QuantizationExplainer } from "./generated/QuantizationExplainer";
 import { LlmTokenizationExplainer } from "./generated/LlmTokenizationExplainer";
 import { NeuralNetworkCatRecognition } from "./generated/NeuralNetworkCatRecognition";
+import { MarketingFunnel } from "./generated/MarketingFunnel";
 /* ANIMOTION_IMPORTS_END */
 
 export const RemotionRoot: React.FC = () => {
@@ -139,6 +140,14 @@ export const RemotionRoot: React.FC = () => {
         <Composition
           id="NeuralNetworkCatRecognition"
           component={NeuralNetworkCatRecognition}
+          durationInFrames={840}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="MarketingFunnel"
+          component={MarketingFunnel}
           durationInFrames={840}
           fps={30}
           width={1920}

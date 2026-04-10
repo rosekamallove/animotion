@@ -34,6 +34,13 @@
       "duration": 840,
       "fps": 30,
       "createdAt": "2026-04-10T11:59:16.810Z"
+    },
+    {
+      "name": "MarketingFunnel",
+      "file": "MarketingFunnel.tsx",
+      "duration": 840,
+      "fps": 30,
+      "createdAt": "2026-04-10T17:52:33.691Z"
     }
   ]
 }
