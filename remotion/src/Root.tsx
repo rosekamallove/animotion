@@ -15,6 +15,7 @@ import { DropInMath } from "./TurboQuant/scenes/DropInMath";
 import { NeuralNetworkTextProcessor } from "./generated/NeuralNetworkTextProcessor";
 import { NeuralNetworkTextProcessing } from "./generated/NeuralNetworkTextProcessing";
 import { QuantizationExplainer } from "./generated/QuantizationExplainer";
+import { LlmTokenizationExplainer } from "./generated/LlmTokenizationExplainer";
 /* ANIMOTION_IMPORTS_END */
 
 export const RemotionRoot: React.FC = () => {
@@ -122,6 +123,14 @@ export const RemotionRoot: React.FC = () => {
           id="QuantizationExplainer"
           component={QuantizationExplainer}
           durationInFrames={840}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="LlmTokenizationExplainer"
+          component={LlmTokenizationExplainer}
+          durationInFrames={450}
           fps={30}
           width={1920}
           height={1080}
