@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { streamCode } from "../../../lib/claude";
 import type { AnimationPlan } from "../../../lib/claude";
+import { getVideoContext, formatVideoContext } from "../../../lib/videos";
 
 export async function POST(req: NextRequest) {
   try {
-    const { plan, prompt, style } = await req.json();
+    const { plan, prompt, style, videoId } = await req.json();
 
     if (!plan || !prompt) {
       return NextResponse.json(
@@ -13,7 +14,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const stream = streamCode(plan as AnimationPlan, prompt, style || "standard");
+    // Build video context if this scene belongs to a video
+    let videoContext: string | undefined;
+    if (videoId) {
+      const ctx = getVideoContext(videoId);
+      if (ctx) {
+        videoContext = formatVideoContext(ctx);
+      }
+    }
+
+    const stream = streamCode(plan as AnimationPlan, prompt, style || "standard", videoContext);
     const encoder = new TextEncoder();
     let fullCode = "";
 

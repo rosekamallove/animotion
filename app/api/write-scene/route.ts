@@ -4,7 +4,7 @@ import { fixCode } from "../../../lib/claude";
 
 export async function POST(req: NextRequest) {
   try {
-    const { sceneName, code, durationFrames, fps, style } = await req.json();
+    const { sceneName, code, durationFrames, fps, style, videoId, description } = await req.json();
 
     if (!sceneName || !code || !durationFrames) {
       return NextResponse.json(
@@ -14,7 +14,10 @@ export async function POST(req: NextRequest) {
     }
 
     // Write the scene
-    const { scenePath } = writeScene(sceneName, code, durationFrames, fps || 30);
+    const { scenePath } = writeScene(sceneName, code, durationFrames, fps || 30, {
+      videoId: videoId || undefined,
+      description: description || "",
+    });
 
     // Validate TypeScript
     let validation = validateTypeScript();
@@ -25,7 +28,10 @@ export async function POST(req: NextRequest) {
       const fixedCode = await fixCode(code, validation.errors, style || "standard");
 
       // Rewrite with fixed code
-      writeScene(sceneName, fixedCode, durationFrames, fps || 30);
+      writeScene(sceneName, fixedCode, durationFrames, fps || 30, {
+        videoId: videoId || undefined,
+        description: description || "",
+      });
 
       // Validate again
       validation = validateTypeScript();

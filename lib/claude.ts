@@ -201,12 +201,17 @@ export function streamRevisePlan(
 export function streamCode(
   plan: AnimationPlan,
   originalPrompt: string,
-  style: StylePreset = "standard"
+  style: StylePreset = "standard",
+  videoContext?: string
 ) {
+  const systemPrompt = videoContext
+    ? `${getCodeSystemPrompt(style)}\n\n${videoContext}`
+    : getCodeSystemPrompt(style);
+
   return client.messages.stream({
     model: "claude-opus-4-6",
     max_tokens: 16384,
-    system: getCodeSystemPrompt(style),
+    system: systemPrompt,
     messages: [
       {
         role: "user",

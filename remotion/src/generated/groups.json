@@ -1,0 +1,12 @@
+{
+  "groups": [
+    {
+      "id": "turboquant",
+      "name": "TurboQuant",
+      "style": "professional",
+      "createdAt": "2026-04-11T20:15:05.764Z",
+      "scenes": []
+    }
+  ],
+  "standalone": []
+}

@@ -171,56 +171,48 @@ Use `sessionStorage` (per-tab, clears on tab close) to persist the working sessi
 
 ---
 
-## Phase 6: Groups — Shared Context + Sidebar Layout
+## Phase 6: Videos — Shared Context + Sidebar Layout + Scripts
 
 ### Goal
-Create groups of related animations (like TurboQuant) where every scene shares the same design language. Each new scene sees code from previous scenes in the group via a rolling window.
+Create videos (series of related animations) where every scene shares the same design language. Each video has an optional full script/narrative. Each new scene sees code from previous scenes via a rolling window, plus the video script for narrative context.
 
 ### Layout
-Sidebar (280px) + main area. Sidebar shows groups with collapsible scene lists, "+ New Scene" / "+ New Group" buttons. Main area shows: welcome, group overview, scene preview, or the creation flow depending on selection.
+Sidebar (280px) + main area. Sidebar shows videos with collapsible scene lists, "+ New Scene" / "+ New Video" buttons. Main area shows: welcome, video overview (with script editor), scene preview, or the creation flow depending on selection.
 
 ### Data Model
-`remotion/src/generated/groups.json` stores groups with their scenes. Files stay flat in `generated/`. Root.tsx registers group scenes in `<Folder name={groupName}>`.
+`remotion/src/generated/videos.json` stores videos with their scenes and scripts. Files stay flat in `generated/`. Root.tsx registers video scenes in `<Folder name={videoName}>`.
 
 ```json
 {
-  "groups": [
-    { "id": "turbo-quant", "name": "TurboQuant", "style": "standard", "scenes": [...] }
+  "videos": [
+    { "id": "turbo-quant", "name": "TurboQuant", "style": "standard", "script": "...", "scenes": [...] }
   ],
   "standalone": [...]
 }
 ```
 
-### Context Passing (Rolling Window)
-- Scene 1: No group context
-- Scene 2: Full code of Scene 1
-- Scene 3: Full code of Scenes 1 + 2
-- Scene 4+: Full code of N-2 and N-1, older scenes as summaries (name + description)
+### Context Passing (Rolling Window + Script)
+- Video script is always included in context (if set)
+- Scene 1: Video script only (no prior scene context)
+- Scene 2: Video script + full code of Scene 1
+- Scene 3: Video script + full code of Scenes 1 + 2
+- Scene 4+: Video script + full code of N-2 and N-1, older scenes as summaries (name + description)
 
-Injected as `## GROUP CONTEXT` section in the code system prompt with instruction to match design language.
+Injected as `## VIDEO CONTEXT` section in the code system prompt with instruction to match design language and fit the narrative.
 
-### New Files
-- `lib/groups.ts` — types, CRUD, context reader (reads .tsx files for rolling window)
-- `app/api/groups/route.ts` — GET (list), POST (create)
+### Files
+- `lib/videos.ts` — types (Video, VideoScene, VideosData), CRUD, context reader with script support
+- `app/api/videos/route.ts` — GET (list), POST (create), PATCH (update script)
 - `app/api/scene-code/route.ts` — GET scene code by name
-- `app/components/Sidebar.tsx` — group/scene navigation
+- `app/components/Sidebar.tsx` — video/scene navigation
 - `app/components/SceneCreator.tsx` — extracted creation flow from page.tsx
 - `app/components/SceneViewer.tsx` — preview existing scene
-- `app/components/GroupOverview.tsx` — group details + scene list
-
-### Modified Files
-- `app/page.tsx` — rewrite as sidebar + main area coordinator
-- `lib/remotion-writer.ts` — group-aware writeScene, Root.tsx folders
-- `lib/prompts.ts` — add GROUP CONTEXT section
-- `lib/claude.ts` — pass groupContext to streamCode
-- `app/api/generate-code/route.ts` — accept groupId, read context
-- `app/api/write-scene/route.ts` — accept groupId
-- `app/api/generate-plan/route.ts` — accept groupId
-
-### Implementation Order
-1. Data model + groups API
-2. Sidebar layout + component extraction
-3. Wire context into code generation
+- `app/components/VideoOverview.tsx` — video details, script editor, scene list
+- `app/page.tsx` — sidebar + main area coordinator
+- `lib/remotion-writer.ts` — video-aware writeScene, Root.tsx folders
+- `lib/claude.ts` — pass videoContext to streamCode
+- `app/api/generate-code/route.ts` — accept videoId, read context
+- `app/api/write-scene/route.ts` — accept videoId
 
 ---
 
@@ -231,4 +223,4 @@ Injected as `## GROUP CONTEXT` section in the code system prompt with instructio
 3. **Phase 3: In-Browser Preview** ✅
 4. **Phase 4: Rendering (1080p)** ✅
 5. **Phase 5: State Persistence** ✅
-6. **Phase 6: Groups** — sidebar layout, shared context, rolling window ← NEXT
+6. **Phase 6: Videos** ✅

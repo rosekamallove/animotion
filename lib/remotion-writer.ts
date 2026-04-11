@@ -1,6 +1,13 @@
 import fs from "fs";
 import path from "path";
 import { execSync } from "child_process";
+import {
+  readVideos,
+  addSceneToVideo,
+  addStandaloneScene,
+  type VideoScene,
+  type VideosData,
+} from "./videos";
 
 const REMOTION_ROOT = path.resolve(process.cwd(), "remotion");
 const GENERATED_DIR = path.join(REMOTION_ROOT, "src", "generated");
@@ -46,7 +53,8 @@ export function writeScene(
   sceneName: string,
   code: string,
   durationFrames: number,
-  fps: number
+  fps: number,
+  options?: { videoId?: string; description?: string }
 ): { scenePath: string } {
   ensureGeneratedDir();
 
@@ -56,7 +64,7 @@ export function writeScene(
   // Write the scene file
   fs.writeFileSync(scenePath, code);
 
-  // Update manifest
+  // Update manifest (keeps backward compat)
   const manifest = readManifest();
   const existingIdx = manifest.scenes.findIndex((s) => s.name === sceneName);
   const entry: ManifestEntry = {
@@ -74,8 +82,25 @@ export function writeScene(
   }
   writeManifest(manifest);
 
-  // Update Root.tsx
-  updateRootTsx(manifest);
+  // Track in videos.json
+  const videoScene: VideoScene = {
+    name: sceneName,
+    file: fileName,
+    description: options?.description || "",
+    duration: durationFrames,
+    fps,
+    createdAt: new Date().toISOString(),
+  };
+
+  if (options?.videoId) {
+    addSceneToVideo(options.videoId, videoScene);
+  } else {
+    addStandaloneScene(videoScene);
+  }
+
+  // Update Root.tsx with video-aware folders
+  const videosData = readVideos();
+  updateRootTsx(manifest, videosData);
 
   // Update registry for @remotion/player dynamic imports
   updateRegistry(manifest);
@@ -94,12 +119,11 @@ function updateRegistry(manifest: Manifest) {
   fs.writeFileSync(REGISTRY_PATH, lines.join("\n"));
 }
 
-function updateRootTsx(manifest: Manifest) {
+function updateRootTsx(manifest: Manifest, videosData: VideosData) {
   let rootContent = fs.readFileSync(ROOT_TSX, "utf-8");
 
   // Inject markers if they don't exist yet
   if (!rootContent.includes(IMPORTS_START)) {
-    // Add import markers before the RemotionRoot export
     rootContent = rootContent.replace(
       /export const RemotionRoot/,
       `${IMPORTS_START}\n${IMPORTS_END}\n\nexport const RemotionRoot`
@@ -107,13 +131,11 @@ function updateRootTsx(manifest: Manifest) {
   }
 
   if (!rootContent.includes(COMPOSITIONS_START)) {
-    // Add composition markers before the closing </> tag
     rootContent = rootContent.replace(
       /(\s*)<\/>/,
       `\n      ${COMPOSITIONS_START}\n      ${COMPOSITIONS_END}\n$1</>`
     );
 
-    // Also add Folder import if not present
     if (!rootContent.includes("Folder")) {
       rootContent = rootContent.replace(
         'import { Composition } from "remotion";',
@@ -122,21 +144,74 @@ function updateRootTsx(manifest: Manifest) {
     }
   }
 
-  // Generate import block
-  const imports = manifest.scenes
+  // Collect all scene names from manifest
+  const allScenes = manifest.scenes;
+
+  // Build sets of scenes that belong to videos
+  const videoSceneNames = new Set<string>();
+  for (const video of videosData.videos) {
+    for (const scene of video.scenes) {
+      videoSceneNames.add(scene.name);
+    }
+  }
+
+  // Standalone = in manifest but not in any video
+  const standaloneScenes = allScenes.filter(
+    (s) => !videoSceneNames.has(s.name)
+  );
+
+  // Generate import block (all scenes, flat)
+  const imports = allScenes
     .map((s) => `import { ${s.name} } from "./generated/${s.name}";`)
     .join("\n");
 
-  // Generate composition block
-  const compositions = manifest.scenes
-    .map(
-      (s) =>
-        `        <Composition\n          id="${s.name}"\n          component={${s.name}}\n          durationInFrames={${s.duration}}\n          fps={${s.fps}}\n          width={1920}\n          height={1080}\n        />`
-    )
-    .join("\n");
+  // Generate composition block with group folders
+  const compositionLines: string[] = [];
 
-  const compositionsBlock = manifest.scenes.length > 0
-    ? `<Folder name="Generated">\n${compositions}\n      </Folder>`
+  // Video folders
+  for (const video of videosData.videos) {
+    const videoScenes = video.scenes.filter((vs) =>
+      allScenes.some((ms) => ms.name === vs.name)
+    );
+    if (videoScenes.length === 0) continue;
+
+    compositionLines.push(`<Folder name="${video.name}">`);
+    for (const vs of videoScenes) {
+      const ms = allScenes.find((s) => s.name === vs.name)!;
+      compositionLines.push(
+        `          <Composition`,
+        `            id="${ms.name}"`,
+        `            component={${ms.name}}`,
+        `            durationInFrames={${ms.duration}}`,
+        `            fps={${ms.fps}}`,
+        `            width={1920}`,
+        `            height={1080}`,
+        `          />`
+      );
+    }
+    compositionLines.push(`        </Folder>`);
+  }
+
+  // Standalone scenes (in "Generated" folder if any)
+  if (standaloneScenes.length > 0) {
+    compositionLines.push(`<Folder name="Generated">`);
+    for (const s of standaloneScenes) {
+      compositionLines.push(
+        `          <Composition`,
+        `            id="${s.name}"`,
+        `            component={${s.name}}`,
+        `            durationInFrames={${s.duration}}`,
+        `            fps={${s.fps}}`,
+        `            width={1920}`,
+        `            height={1080}`,
+        `          />`
+      );
+    }
+    compositionLines.push(`        </Folder>`);
+  }
+
+  const compositionsBlock = compositionLines.length > 0
+    ? compositionLines.join("\n        ")
     : "";
 
   // Replace between markers
