@@ -48,6 +48,13 @@
       "duration": 300,
       "fps": 30,
       "createdAt": "2026-04-10T18:04:47.748Z"
+    },
+    {
+      "name": "KVCacheExplainer",
+      "file": "KVCacheExplainer.tsx",
+      "duration": 450,
+      "fps": 30,
+      "createdAt": "2026-04-11T20:28:54.354Z"
     }
   ]
 }
