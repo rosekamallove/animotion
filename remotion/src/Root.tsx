@@ -19,7 +19,7 @@ import { LlmTokenizationExplainer } from "./generated/LlmTokenizationExplainer";
 import { NeuralNetworkCatRecognition } from "./generated/NeuralNetworkCatRecognition";
 import { MarketingFunnel } from "./generated/MarketingFunnel";
 import { LLMTokenisation } from "./generated/LLMTokenisation";
-import { KVCacheExplainer } from "./generated/KVCacheExplainer";
+import { KVCacheScalingProblem } from "./generated/KVCacheScalingProblem";
 /* ANIMOTION_IMPORTS_END */
 
 export const RemotionRoot: React.FC = () => {
@@ -108,9 +108,9 @@ export const RemotionRoot: React.FC = () => {
       {/* ANIMOTION_COMPOSITIONS_START */}
       <Folder name="TurboQuant">
                   <Composition
-                    id="KVCacheExplainer"
-                    component={KVCacheExplainer}
-                    durationInFrames={450}
+                    id="KVCacheScalingProblem"
+                    component={KVCacheScalingProblem}
+                    durationInFrames={840}
                     fps={30}
                     width={1920}
                     height={1080}

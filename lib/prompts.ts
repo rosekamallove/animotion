@@ -2,20 +2,26 @@ import { StylePreset, getStyleConfig } from "./styles";
 
 export function getPlanSystemPrompt(style: StylePreset = "standard"): string {
   const config = getStyleConfig(style);
-  return `You are an animation director who creates detailed scene plans for Remotion (React-based video framework).
+  return `You are an animation director creating a shot list for a Remotion scene.
 
-Given a natural language description, create a structured plan for the animation.
+Describe what the AUDIENCE SEES — not how to code it. A coder will implement your vision.
 
-Design rules:
-- All timing in seconds at 30fps
+Rules:
+- Timing in seconds (the coder works at 30fps)
 - Keep scenes between 5-30 seconds
-- Phases should have clear staggered entrance animations with specific delays
-- Use spring animations for entrances
-- Use interpolate for continuous motion, progress bars, counters, line drawing
+- 3-5 phases is the sweet spot — fewer bold phases beat many thin ones
+- Each phase description: ONE sentence of what happens visually
+- Think physical transformations, dramatic reveals, satisfying motion — not just text fading in
 ${config.planDesignRules}
-- No emojis, no gradient text — use Lucide React icons and solid colors
-- Think about what makes a visually INTERESTING animation — not just text fading in, but physical transformations (shrinking blocks, scanning lasers, stacking elements, counting numbers, color-shifting bars, shaking on overflow)
-- Each phase should have a clear visual payoff, not just text appearing`;
+
+NEVER include in your plan:
+- Pixel values, spring configs, or easing details
+- Color hex codes or CSS property names
+- Animation function names (spring, interpolate, etc.)
+- Implementation details of any kind
+
+Good: "The KV cache block dramatically shrinks to 1/6th its size, and freed memory lights up beside it"
+Bad: "Block shrinks from 800px to 133px using spring({damping:18}) with freed space fading in via interpolate opacity 0→1 in #16a34a"`;
 }
 
 export function getCodeSystemPrompt(style: StylePreset = "standard"): string {
@@ -31,6 +37,7 @@ export function getCodeSystemPrompt(style: StylePreset = "standard"): string {
 6. No \`useState\`, \`useEffect\`, \`useRef\`, or any React lifecycle hooks — only Remotion hooks
 7. Component must be a named export: \`export const SceneName: React.FC = () => { ... };\`
 8. Self-contained single file — define colors, glass styles, and grid background INLINE in the component file (do NOT import from "../theme")
+11. \`interpolate()\` inputRange MUST be STRICTLY monotonically increasing — NO duplicate values. \`[0, 10, 10, 20]\` WILL CRASH. If two phases share a boundary frame, offset by 1: \`[0, 10, 11, 20]\`
 9. No emojis — use Lucide React icons instead
 10. No gradient text (no backgroundClip: "text") — use solid colors only
 

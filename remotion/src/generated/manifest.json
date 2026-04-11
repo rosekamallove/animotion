@@ -55,6 +55,13 @@
       "duration": 450,
       "fps": 30,
       "createdAt": "2026-04-11T20:28:54.354Z"
+    },
+    {
+      "name": "KVCacheScalingProblem",
+      "file": "KVCacheScalingProblem.tsx",
+      "duration": 840,
+      "fps": 30,
+      "createdAt": "2026-04-11T20:55:39.561Z"
     }
   ]
 }

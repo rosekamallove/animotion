@@ -144,8 +144,16 @@ function updateRootTsx(manifest: Manifest, videosData: VideosData) {
     }
   }
 
-  // Collect all scene names from manifest
-  const allScenes = manifest.scenes;
+  // Extract existing composition IDs from hand-coded section (before ANIMOTION markers)
+  const handCodedSection = rootContent.split(COMPOSITIONS_START)[0];
+  const existingIds = new Set(
+    [...handCodedSection.matchAll(/id="([^"]+)"/g)].map((m) => m[1])
+  );
+
+  // Filter manifest scenes to exclude those that collide with hand-coded compositions
+  const allScenes = manifest.scenes.filter(
+    (s) => !existingIds.has(s.name)
+  );
 
   // Build sets of scenes that belong to videos
   const videoSceneNames = new Set<string>();
@@ -155,7 +163,7 @@ function updateRootTsx(manifest: Manifest, videosData: VideosData) {
     }
   }
 
-  // Standalone = in manifest but not in any video
+  // Standalone = in filtered manifest but not in any video
   const standaloneScenes = allScenes.filter(
     (s) => !videoSceneNames.has(s.name)
   );

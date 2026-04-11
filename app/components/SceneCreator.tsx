@@ -60,24 +60,13 @@ const styleOptions: Array<{
 
 interface AnimationPlan {
   sceneName: string;
-  compositionId: string;
   description: string;
   durationSeconds: number;
-  durationFrames: number;
   fps: number;
-  width: number;
-  height: number;
   phases: Array<{
     name: string;
     startSecond: number;
     endSecond: number;
-    description: string;
-    elements: string[];
-    animationType: string;
-  }>;
-  visualElements: Array<{
-    name: string;
-    type: string;
     description: string;
   }>;
 }
@@ -244,7 +233,7 @@ export function SceneCreator({ videoId, videoName, videoStyle, onComplete, onBac
         body: JSON.stringify({
           sceneName: plan.sceneName,
           code: generatedCode,
-          durationFrames: plan.durationFrames,
+          durationFrames: plan.durationSeconds * plan.fps,
           fps: plan.fps,
           style,
           videoId,
@@ -353,12 +342,12 @@ export function SceneCreator({ videoId, videoName, videoStyle, onComplete, onBac
 
   const updatePlanDuration = (seconds: number) => {
     if (!plan || seconds < 1) return;
-    setPlan({ ...plan, durationSeconds: seconds, durationFrames: seconds * plan.fps });
+    setPlan({ ...plan, durationSeconds: seconds });
   };
 
   const updatePlanFps = (newFps: number) => {
     if (!plan) return;
-    setPlan({ ...plan, fps: newFps, durationFrames: plan.durationSeconds * newFps });
+    setPlan({ ...plan, fps: newFps });
   };
 
   const updatePhaseTime = (index: number, field: "startSecond" | "endSecond", value: number) => {
@@ -620,21 +609,9 @@ export function SceneCreator({ videoId, videoName, videoStyle, onComplete, onBac
                   </div>
                 )}
 
-                {planPreview.visualElements && planPreview.visualElements.length > 0 && (
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Visual Elements</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {planPreview.visualElements.map((el, i) => (
-                        <Badge key={i} variant="outline" className="text-xs">
-                          {el.name}{el.type ? ` (${el.type})` : ""}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">Designing phases, timing, and visual elements...</p>
+              <p className="text-sm text-muted-foreground">Designing phases and timing...</p>
             )}
           </CardContent>
         </Card>
@@ -711,19 +688,6 @@ export function SceneCreator({ videoId, videoName, videoStyle, onComplete, onBac
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">{phase.description}</p>
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {plan.visualElements && plan.visualElements.length > 0 && (
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Visual Elements</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {plan.visualElements.map((el, i) => (
-                    <Badge key={i} variant="outline" className="text-xs">
-                      {el.name} ({el.type})
-                    </Badge>
                   ))}
                 </div>
               </div>
@@ -836,7 +800,7 @@ export function SceneCreator({ videoId, videoName, videoStyle, onComplete, onBac
               <RemotionPreview
                 key={scenePath}
                 sceneName={plan.sceneName}
-                durationInFrames={plan.durationFrames}
+                durationInFrames={plan.durationSeconds * plan.fps}
                 fps={plan.fps}
               />
             </div>

@@ -8,85 +8,78 @@ const client = new Anthropic({
 
 export interface AnimationPlan {
   sceneName: string;
-  compositionId: string;
   description: string;
   durationSeconds: number;
-  durationFrames: number;
   fps: number;
-  width: number;
-  height: number;
   phases: Array<{
     name: string;
     startSecond: number;
     endSecond: number;
-    description: string;
-    elements: string[];
-    animationType: "spring" | "interpolate" | "both";
-  }>;
-  visualElements: Array<{
-    name: string;
-    type: "text" | "shape" | "icon" | "container" | "chart" | "svg";
     description: string;
   }>;
 }
 
 const planTool = {
   name: "create_animation_plan" as const,
-  description: "Create a structured animation plan for a Remotion scene",
+  description: "Create a shot list for a Remotion animation scene",
   input_schema: {
     type: "object" as const,
     properties: {
-      sceneName: { type: "string" as const, description: "PascalCase component name" },
-      compositionId: { type: "string" as const, description: "Same as sceneName" },
-      description: { type: "string" as const, description: "1-2 sentence summary" },
-      durationSeconds: { type: "number" as const },
-      durationFrames: { type: "number" as const },
-      fps: { type: "number" as const },
-      width: { type: "number" as const },
-      height: { type: "number" as const },
+      sceneName: { type: "string" as const, description: "PascalCase component name (e.g. KVCacheExplainer)" },
+      description: { type: "string" as const, description: "1-2 sentence summary of what the scene shows" },
+      durationSeconds: { type: "number" as const, description: "Total duration in seconds" },
+      fps: { type: "number" as const, description: "Frames per second (usually 30)" },
       phases: {
         type: "array" as const,
+        description: "3-5 phases, each a single sentence of what the audience sees",
         items: {
           type: "object" as const,
           properties: {
-            name: { type: "string" as const },
+            name: { type: "string" as const, description: "Short label (e.g. 'Block Shrinks')" },
             startSecond: { type: "number" as const },
             endSecond: { type: "number" as const },
-            description: { type: "string" as const },
-            elements: { type: "array" as const, items: { type: "string" as const } },
-            animationType: { type: "string" as const, enum: ["spring", "interpolate", "both"] },
+            description: { type: "string" as const, description: "One sentence: what the audience sees in this phase" },
           },
-          required: ["name", "startSecond", "endSecond", "description", "elements", "animationType"],
-        },
-      },
-      visualElements: {
-        type: "array" as const,
-        items: {
-          type: "object" as const,
-          properties: {
-            name: { type: "string" as const },
-            type: { type: "string" as const, enum: ["text", "shape", "icon", "container", "chart", "svg"] },
-            description: { type: "string" as const },
-          },
-          required: ["name", "type", "description"],
+          required: ["name", "startSecond", "endSecond", "description"],
         },
       },
     },
-    required: ["sceneName", "compositionId", "description", "durationSeconds", "durationFrames", "fps", "width", "height", "phases", "visualElements"],
+    required: ["sceneName", "description", "durationSeconds", "fps", "phases"],
   },
 };
+
+function formatPlanForCodeGen(plan: AnimationPlan, originalPrompt: string): string {
+  const totalFrames = plan.durationSeconds * plan.fps;
+  const phases = plan.phases
+    .map((p) => `[${p.startSecond}s - ${p.endSecond}s] ${p.name}: ${p.description}`)
+    .join("\n");
+
+  return `Generate a complete Remotion animation component. Use the creative direction below as loose guidance — you decide the implementation details. Feel free to add visual polish, adjust timing for flow, and choose animation approaches that look best.
+
+Scene: "${plan.sceneName}" (${plan.durationSeconds}s at ${plan.fps}fps, ${totalFrames} frames)
+
+Creative direction: ${plan.description}
+
+Phases:
+${phases}
+
+Original request: "${originalPrompt}"
+
+IMPORTANT: Return ONLY the TSX code. No markdown fences, no explanations, no comments before or after the code. Start with "import" and end with "};".`;
+}
 
 export async function generatePlan(prompt: string, style: StylePreset = "standard"): Promise<AnimationPlan> {
   const message = await client.messages.create({
     model: "claude-sonnet-4-6",
-    max_tokens: 8192,
+    max_tokens: 4096,
+    temperature: 0.7,
     system: getPlanSystemPrompt(style),
     tools: [planTool],
     tool_choice: { type: "tool", name: "create_animation_plan" },
     messages: [
       {
         role: "user",
-        content: `Create a detailed animation plan for:\n\n${prompt}`,
+        content: `Create an animation plan for:\n\n${prompt}`,
       },
     ],
   });
@@ -107,18 +100,12 @@ export async function generateCode(
   const message = await client.messages.create({
     model: "claude-opus-4-6",
     max_tokens: 16384,
+    temperature: 0.8,
     system: getCodeSystemPrompt(style),
     messages: [
       {
         role: "user",
-        content: `Generate a complete Remotion animation component based on this plan.
-
-Original request: "${originalPrompt}"
-
-Plan:
-${JSON.stringify(plan, null, 2)}
-
-IMPORTANT: Return ONLY the TSX code. No markdown fences, no explanations, no comments before or after the code. Start with "import" and end with "};".`,
+        content: formatPlanForCodeGen(plan, originalPrompt),
       },
     ],
   });
@@ -139,14 +126,15 @@ IMPORTANT: Return ONLY the TSX code. No markdown fences, no explanations, no com
 export function streamPlan(prompt: string, style: StylePreset = "standard") {
   return client.messages.stream({
     model: "claude-sonnet-4-6",
-    max_tokens: 8192,
+    max_tokens: 4096,
+    temperature: 0.7,
     system: getPlanSystemPrompt(style),
     tools: [planTool],
     tool_choice: { type: "tool", name: "create_animation_plan" },
     messages: [
       {
         role: "user",
-        content: `Create a detailed animation plan for:\n\n${prompt}`,
+        content: `Create an animation plan for:\n\n${prompt}`,
       },
     ],
   });
@@ -160,14 +148,15 @@ export function streamRevisePlan(
 ) {
   return client.messages.stream({
     model: "claude-sonnet-4-6",
-    max_tokens: 8192,
+    max_tokens: 4096,
+    temperature: 0.7,
     system: getPlanSystemPrompt(style),
     tools: [planTool],
     tool_choice: { type: "tool", name: "create_animation_plan" },
     messages: [
       {
         role: "user",
-        content: `Create a detailed animation plan for:\n\n${originalPrompt}`,
+        content: `Create an animation plan for:\n\n${originalPrompt}`,
       },
       {
         role: "assistant",
@@ -192,7 +181,7 @@ export function streamRevisePlan(
       },
       {
         role: "user",
-        content: `Revise the animation plan based on this feedback:\n\n${feedback}\n\nReturn the complete updated plan with all fields.`,
+        content: `Revise the animation plan based on this feedback:\n\n${feedback}\n\nReturn the complete updated plan.`,
       },
     ],
   });
@@ -211,18 +200,12 @@ export function streamCode(
   return client.messages.stream({
     model: "claude-opus-4-6",
     max_tokens: 16384,
+    temperature: 0.8,
     system: systemPrompt,
     messages: [
       {
         role: "user",
-        content: `Generate a complete Remotion animation component based on this plan.
-
-Original request: "${originalPrompt}"
-
-Plan:
-${JSON.stringify(plan, null, 2)}
-
-IMPORTANT: Return ONLY the TSX code. No markdown fences, no explanations, no comments before or after the code. Start with "import" and end with "};".`,
+        content: formatPlanForCodeGen(plan, originalPrompt),
       },
     ],
   });
@@ -236,6 +219,7 @@ export async function fixCode(
   const message = await client.messages.create({
     model: "claude-opus-4-6",
     max_tokens: 16384,
+    temperature: 0.8,
     system: getCodeSystemPrompt(style),
     messages: [
       {

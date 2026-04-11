@@ -42,14 +42,10 @@ const gridBg: React.CSSProperties = {
   backgroundImage: "linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px)",
   backgroundSize: "60px 60px",
 };`,
-  planDesignRules: `- Design for 1920x1080 resolution on a pure white (#ffffff) background
-- Clean, corporate, professional aesthetic — subtle shadows, clean cards, no glow effects
-- Color palette: blue (#2563eb) primary, violet (#7c3aed) accent, green (#16a34a) success, red (#dc2626) error, amber (#d97706) warning
-- ONLY smooth springs (damping: 200) — absolutely no bouncy effects, no overshoot
-- Inter font for everything — clean, readable, minimal
-- Monospace ('SF Mono', 'Fira Code') for numbers and code
-- No decorative elements — data and content first
-- Subtle entrance animations only — slide up 20px + fade, no scale pops, no rotation
+  planDesignRules: `- Clean, corporate, professional aesthetic — white background, subtle shadows, no glow
+- All motion is smooth and understated — nothing bouncy or playful
+- Elements glide in subtly, no popping or bouncing
+- Data and content first, no decorative elements
 - Think Bloomberg terminal, Stripe dashboard, corporate keynote`,
   styleRules: `## STYLE: PROFESSIONAL
 - Use ONLY smooth springs: config: { damping: 200 }
@@ -101,15 +97,11 @@ const glass: React.CSSProperties = {
 };
 
 const gridBg: React.CSSProperties = {};`,
-  planDesignRules: `- Design for 1920x1080 resolution on a light warm background (#fdf4ff)
-- Vibrant, energetic, playful aesthetic — thick borders, large corners, big fonts
-- Color palette: pink (#ec4899) primary, orange (#f97316) accent, teal (#14b8a6) success, red (#ef4444) error
-- Bouncy springs EVERYWHERE (damping: 8-12, stiffness: 120-200) — things should bounce, pop, and overshoot
-- Large fonts, generous spacing, rounded corners (24px)
-- Fun entrance effects — scale pops from 0.3→1, slight rotation, overshoot
-- Use Montserrat 700/900 for headlines, Inter for body
-- Think children's TV, product launch, social media content
-- Each element should feel alive and energetic`,
+  planDesignRules: `- Vibrant, energetic, playful aesthetic — warm light background
+- Everything bounces, pops, and overshoots — nothing should feel stiff
+- Big, bold, fun — large fonts, generous spacing, thick rounded shapes
+- Each element should feel alive and energetic
+- Think children's TV, product launch, social media content`,
   styleRules: `## STYLE: PLAYFUL
 - Use bouncy springs for EVERYTHING: config: { damping: 10, stiffness: 150 }
 - Scale pops: interpolate(spring, [0, 1], [0.3, 1])
@@ -162,17 +154,10 @@ const gridBg: React.CSSProperties = {
   backgroundImage: "linear-gradient(rgba(0,0,0,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px)",
   backgroundSize: "60px 60px",
 };`,
-  planDesignRules: `- Design for 1920x1080 resolution on a light gray (#f8fafc) background
-- Modern tech aesthetic with glass-morphism cards and subtle grid overlay
-- Color palette: cyan (#00d4ff) primary, purple (#a855f7) accent, green (#22c55e) success, red (#ef4444) error, yellow (#f59e0b) warning
-- No emojis, no gradient text — use Lucide React icons and solid colors
-- Use Montserrat 700/900 for headlines, Inter 400-700 for body text
-- Monospace ('SF Mono', 'Fira Code') for numbers and code
-- Mix of bouncy (damping 8-14) and smooth (damping 200) springs
-- Glass-morphism cards for containers
-- Think tech demo, developer tools, explainer content
-- Physical transformations (shrinking, scaling, shaking) > simple fades
-- Each phase should have a clear visual payoff, not just text appearing`,
+  planDesignRules: `- Modern tech aesthetic — light gray background, glass-morphism cards, grid overlay
+- Mix of smooth glides for text and punchy pops for impact moments
+- Physical transformations (shrinking, scaling, shaking) over simple fades
+- Think tech demo, developer tools, explainer content`,
   styleRules: `## STYLE: STANDARD
 - Mix of smooth springs (damping: 200) for text/titles and bouncy springs (damping: 8-14) for impact moments
 - Scale pops for cards/badges, smooth slides for text
