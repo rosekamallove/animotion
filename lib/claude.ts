@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { getPlanSystemPrompt, getCodeSystemPrompt } from "./prompts";
+import type { MessageParam } from "@anthropic-ai/sdk/resources/messages";
+import { getPlanSystemPrompt, getCodeSystemPrompt, getChatSystemPrompt } from "./prompts";
 import { StylePreset } from "./styles";
 
 const client = new Anthropic({
@@ -202,11 +203,25 @@ export function streamCode(
   plan: AnimationPlan,
   originalPrompt: string,
   style: StylePreset = "standard",
-  videoContext?: string
+  videoContext?: string,
+  existingCode?: string
 ) {
   const systemPrompt = videoContext
     ? `${getCodeSystemPrompt(style)}\n\n${videoContext}`
     : getCodeSystemPrompt(style);
+
+  const editSection = existingCode
+    ? `
+
+This is an EDIT to an existing scene. The user has requested changes and the plan below reflects them.
+
+Current code:
+\`\`\`tsx
+${existingCode}
+\`\`\`
+
+Preserve every element, animation, color, and timing the plan has NOT changed. Apply the plan changes surgically — do not redesign the scene. The exported component name MUST remain "${plan.sceneName}".`
+    : "";
 
   return client.messages.stream({
     model: "claude-opus-4-6",
@@ -220,11 +235,59 @@ export function streamCode(
 Original request: "${originalPrompt}"
 
 Plan:
-${JSON.stringify(plan, null, 2)}
+${JSON.stringify(plan, null, 2)}${editSection}
 
 IMPORTANT: Return ONLY the TSX code. No markdown fences, no explanations, no comments before or after the code. Start with "import" and end with "};".`,
       },
     ],
+  });
+}
+
+// --- Chat mode (conversational agent for creating + editing scenes) ---
+
+const askFollowupTool = {
+  name: "ask_followup" as const,
+  description:
+    "Ask ONE focused clarifying question when the user's request is too vague to plan a good animation. Use sparingly — prefer proposing a plan with reasonable defaults over asking. Good reasons to ask: user gave no hint of topic (\"make me an animation\"), missing a crucial decision between two very different interpretations.",
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      question: {
+        type: "string" as const,
+        description:
+          "A single, focused, friendly question. Can bundle 2-3 related sub-questions into one conversational sentence, but don't interrogate the user.",
+      },
+    },
+    required: ["question"],
+  },
+};
+
+const proposePlanTool = {
+  ...planTool,
+  name: "propose_plan" as const,
+  description:
+    "Propose a full animation plan. Use this for fresh requests that have enough detail, and for edit requests on an already-implemented scene (return the REVISED plan). Always return the complete plan, not a diff.",
+};
+
+export interface ChatContext {
+  style: StylePreset;
+  videoName?: string;
+  videoScript?: string;
+  sceneContext?: {
+    sceneName: string;
+    plan: AnimationPlan;
+    code: string;
+  };
+}
+
+export function streamChat(messages: MessageParam[], context: ChatContext) {
+  return client.messages.stream({
+    model: "claude-sonnet-4-6",
+    max_tokens: 8192,
+    system: getChatSystemPrompt(context),
+    tools: [askFollowupTool, proposePlanTool],
+    tool_choice: { type: "any" },
+    messages,
   });
 }
 

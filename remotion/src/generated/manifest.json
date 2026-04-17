@@ -55,6 +55,13 @@
       "duration": 450,
       "fps": 30,
       "createdAt": "2026-04-11T20:28:54.354Z"
+    },
+    {
+      "name": "QueryPlanOptimizer",
+      "file": "QueryPlanOptimizer.tsx",
+      "duration": 660,
+      "fps": 30,
+      "createdAt": "2026-04-17T13:09:54.762Z"
     }
   ]
 }

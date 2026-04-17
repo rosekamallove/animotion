@@ -5,6 +5,7 @@ import { Sparkle, FilmSlate, FilmReel, Plus } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Sidebar } from "./components/Sidebar";
 import { SceneCreator } from "./components/SceneCreator";
+import { ChatCreator } from "./components/ChatCreator";
 import { SceneViewer } from "./components/SceneViewer";
 import { VideoOverview } from "./components/VideoOverview";
 
@@ -35,7 +36,7 @@ type View =
   | { type: "welcome" }
   | { type: "video"; videoId: string }
   | { type: "scene"; sceneName: string; videoId?: string }
-  | { type: "creator"; videoId?: string };
+  | { type: "creator"; videoId?: string; mode?: "chat" | "stepper" };
 
 export default function Home() {
   const [videos, setVideos] = useState<VideoData[]>([]);
@@ -234,21 +235,49 @@ export default function Home() {
               {/* Scene Creator */}
               {view.type === "creator" && (() => {
                 const video = view.videoId ? findVideo(view.videoId) : undefined;
+                const mode = view.mode ?? "chat";
+                const back = () => {
+                  if (video) setView({ type: "video", videoId: video.id });
+                  else setView({ type: "welcome" });
+                };
+                const toggleMode = () =>
+                  setView({
+                    type: "creator",
+                    videoId: view.videoId,
+                    mode: mode === "chat" ? "stepper" : "chat",
+                  });
+
                 return (
-                  <SceneCreator
-                    key={view.videoId || "standalone"}
-                    videoId={video?.id}
-                    videoName={video?.name}
-                    videoStyle={video?.style}
-                    onComplete={handleSceneComplete}
-                    onBack={() => {
-                      if (video) {
-                        setView({ type: "video", videoId: video.id });
-                      } else {
-                        setView({ type: "welcome" });
-                      }
-                    }}
-                  />
+                  <div>
+                    <div className="flex justify-end mb-2">
+                      <button
+                        onClick={toggleMode}
+                        className="text-[11px] text-muted-foreground hover:text-foreground underline underline-offset-2"
+                      >
+                        {mode === "chat" ? "Use classic stepper instead" : "Back to chat mode"}
+                      </button>
+                    </div>
+                    {mode === "chat" ? (
+                      <ChatCreator
+                        key={view.videoId || "standalone"}
+                        videoId={video?.id}
+                        videoName={video?.name}
+                        videoStyle={video?.style}
+                        videoScript={video?.script}
+                        onComplete={handleSceneComplete}
+                        onBack={back}
+                      />
+                    ) : (
+                      <SceneCreator
+                        key={view.videoId || "standalone"}
+                        videoId={video?.id}
+                        videoName={video?.name}
+                        videoStyle={video?.style}
+                        onComplete={handleSceneComplete}
+                        onBack={back}
+                      />
+                    )}
+                  </div>
                 );
               })()}
             </>

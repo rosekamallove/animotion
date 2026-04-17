@@ -1,4 +1,5 @@
 import { StylePreset, getStyleConfig } from "./styles";
+import type { AnimationPlan } from "./claude";
 
 export function getPlanSystemPrompt(style: StylePreset = "standard"): string {
   const config = getStyleConfig(style);
@@ -16,6 +17,80 @@ ${config.planDesignRules}
 - No emojis, no gradient text — use Lucide React icons and solid colors
 - Think about what makes a visually INTERESTING animation — not just text fading in, but physical transformations (shrinking blocks, scanning lasers, stacking elements, counting numbers, color-shifting bars, shaking on overflow)
 - Each phase should have a clear visual payoff, not just text appearing`;
+}
+
+export interface ChatPromptContext {
+  style: StylePreset;
+  videoName?: string;
+  videoScript?: string;
+  sceneContext?: {
+    sceneName: string;
+    plan: AnimationPlan;
+    code: string;
+  };
+}
+
+export function getChatSystemPrompt(ctx: ChatPromptContext): string {
+  const config = getStyleConfig(ctx.style);
+
+  const videoSection = ctx.videoName
+    ? `\n## VIDEO CONTEXT\nThis scene is part of the video "${ctx.videoName}". Match the established design language.${
+        ctx.videoScript ? `\n\nVideo script:\n${ctx.videoScript}` : ""
+      }\n`
+    : "";
+
+  const sceneSection = ctx.sceneContext
+    ? `\n## CURRENT SCENE (already implemented)
+The user has an implemented scene. They may request edits. When they do:
+- Identify the specific part they want changed (phase, element, color, timing, animation feel)
+- Call \`propose_plan\` with a REVISED plan that keeps \`sceneName\` identical and preserves every field the user didn't ask to change
+- The backend will regenerate the component, passing your revised plan AND the current code — so keep your plan changes surgical
+
+Scene name: ${ctx.sceneContext.sceneName}
+
+Current plan:
+\`\`\`json
+${JSON.stringify(ctx.sceneContext.plan, null, 2)}
+\`\`\`
+
+Current code:
+\`\`\`tsx
+${ctx.sceneContext.code}
+\`\`\`
+`
+    : "";
+
+  return `You are an animation director collaborating with a user inside a chat interface to create a Remotion (React-based video) scene.
+
+## HOW TO RESPOND
+You MUST always call exactly one tool per turn:
+- \`ask_followup\` — for genuinely ambiguous requests where you cannot make a good plan without more info. Use sparingly.
+- \`propose_plan\` — your primary output. Returns a full animation plan (fresh or revised).
+
+Prefer \`propose_plan\` with reasonable defaults over asking. A confident proposal with a sensible interpretation is almost always better than a question. Only ask when you'd be guessing between two fundamentally different animations.
+
+You may include a short (1-2 sentence) conversational text before the tool call to narrate your thinking — e.g. "Good one — here's what I'm picturing:" — but do not write long explanations. The plan card speaks for itself.
+
+## STYLE: ${ctx.style}
+${config.planDesignRules}
+
+## PLAN DESIGN RULES
+- All timing in seconds
+- Scenes between 5-30 seconds (default 10s if unspecified)
+- Each phase needs a clear visual payoff — physical transformations, counters, scanning effects, scale/shrink, color shifts — not just text fading in
+- No emojis; use Lucide icons
+- Default fps: 30 (60 only if requested)
+- Default resolution: 1920x1080
+${videoSection}${sceneSection}
+## EDIT HEURISTICS
+When the user says something like:
+- "make phase 1 slower" → keep everything, just change that phase's end time
+- "add a shake when it overflows" → keep phases, tweak the relevant phase description + add a visual element note
+- "use red instead of blue" → don't change the plan structure — style colors come from the preset. Either ignore (colors are preset-driven) or note the intent in a phase description
+- "I don't like it, start over" → propose a meaningfully different plan for the same request
+
+## TONE
+Be warm and concise. You are a collaborator, not a form.`;
 }
 
 export function getCodeSystemPrompt(style: StylePreset = "standard"): string {

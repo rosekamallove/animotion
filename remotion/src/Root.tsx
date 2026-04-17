@@ -20,6 +20,7 @@ import { NeuralNetworkCatRecognition } from "./generated/NeuralNetworkCatRecogni
 import { MarketingFunnel } from "./generated/MarketingFunnel";
 import { LLMTokenisation } from "./generated/LLMTokenisation";
 import { KVCacheExplainer } from "./generated/KVCacheExplainer";
+import { QueryPlanOptimizer } from "./generated/QueryPlanOptimizer";
 /* ANIMOTION_IMPORTS_END */
 
 export const RemotionRoot: React.FC = () => {
@@ -169,6 +170,14 @@ export const RemotionRoot: React.FC = () => {
                     id="LLMTokenisation"
                     component={LLMTokenisation}
                     durationInFrames={300}
+                    fps={30}
+                    width={1920}
+                    height={1080}
+                  />
+                  <Composition
+                    id="QueryPlanOptimizer"
+                    component={QueryPlanOptimizer}
+                    durationInFrames={660}
                     fps={30}
                     width={1920}
                     height={1080}

@@ -5,7 +5,7 @@ import { getVideoContext, formatVideoContext } from "../../../lib/videos";
 
 export async function POST(req: NextRequest) {
   try {
-    const { plan, prompt, style, videoId } = await req.json();
+    const { plan, prompt, style, videoId, existingCode } = await req.json();
 
     if (!plan || !prompt) {
       return NextResponse.json(
@@ -23,7 +23,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const stream = streamCode(plan as AnimationPlan, prompt, style || "standard", videoContext);
+    const stream = streamCode(
+      plan as AnimationPlan,
+      prompt,
+      style || "standard",
+      videoContext,
+      typeof existingCode === "string" && existingCode.length > 0 ? existingCode : undefined,
+    );
     const encoder = new TextEncoder();
     let fullCode = "";
 

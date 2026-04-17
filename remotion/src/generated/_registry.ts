@@ -7,3 +7,4 @@ export { NeuralNetworkCatRecognition } from "./NeuralNetworkCatRecognition";
 export { MarketingFunnel } from "./MarketingFunnel";
 export { LLMTokenisation } from "./LLMTokenisation";
 export { KVCacheExplainer } from "./KVCacheExplainer";
+export { QueryPlanOptimizer } from "./QueryPlanOptimizer";
